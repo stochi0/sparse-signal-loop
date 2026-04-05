@@ -37,9 +37,25 @@ from verifiers.clients.openai_chat_completions_client import OpenAIChatCompletio
 from verifiers.rubrics.judge_rubric import JudgeRubric
 from verifiers.types import ClientConfig, ToolMessage
 
+from .mini_swe_judge_prompts import (
+    ITERATIVE_JUDGE_INSTRUCTION_SUFFIX,
+    JudgeFeedbackMode,
+    swe_judge_prompt_for_mode,
+)
+from .utils.execution_log_parser import decolor_dict_keys, parse_log_fn
+from .utils.prompts import (
+    ACTION_OBSERVATION_TEMPLATE,
+    FORMAT_ERROR_TEMPLATE,
+    PROMPT_TEMPLATE,
+    SYSTEM_PROMPT,
+    render_template,
+)
 from .utils.sandbox_retry import (
     is_retryable_sandbox_api_error,
     is_retryable_sandbox_read_error,
+)
+from .utils.swebench_utils import (
+    get_logs_eval,
 )
 
 
@@ -60,25 +76,6 @@ def make_test_spec(*args, **kwargs):
 
 # We need to clear the root logger which swebench sets up to not get flooded by logs
 logging.root.handlers.clear()
-
-from .mini_swe_judge_prompts import (
-    ITERATIVE_JUDGE_INSTRUCTION_SUFFIX,
-    JudgeFeedbackMode,
-    swe_judge_prompt_for_mode,
-)
-from .utils.execution_log_parser import decolor_dict_keys, parse_log_fn
-from .utils.prompts import (
-    ACTION_OBSERVATION_TEMPLATE,
-    FORMAT_ERROR_TEMPLATE,
-    PROMPT_TEMPLATE,
-    SYSTEM_PROMPT,
-    render_template,
-)
-
-# TODO: make nicer with  _init__.py
-from .utils.swebench_utils import (
-    get_logs_eval,
-)
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 
@@ -608,7 +605,7 @@ class DeepSweSandboxEnv(vf.SandboxEnv):
             },
         )
 
-    async def setup_state(self, state: vf.State, **kwargs: Any) -> vf.State:
+    async def setup_state(self, state: vf.State, **_kwargs: Any) -> vf.State:
         """Create per-rollout sandbox.
 
         Mirrors vf.SandboxEnv.setup_state pattern but with custom setup steps.
@@ -660,9 +657,9 @@ class DeepSweSandboxEnv(vf.SandboxEnv):
         self,
         tool_name: str,
         tool_args: dict[str, Any],
-        messages: vf.Messages,
+        _messages: vf.Messages,
         state: vf.State,
-        **kwargs,
+        **_kwargs,
     ) -> dict[str, Any]:
         if tool_name not in ("execute_bash", "edit_via_str_replace"):
             return tool_args
@@ -1168,7 +1165,7 @@ class DeepSweRubric(vf.Rubric):
         # If the caller wants the test output as well, return (reward, output)
         return reward
 
-    def solved(self, state: vf.State, info: vf.Info, **kwargs: Any) -> int:
+    def solved(self, state: vf.State, info: vf.Info, **_kwargs: Any) -> int:
         if isinstance(state.get("error"), vf.InfraError):
             return 0
         if state.get("max_command_timeouts_reached"):

@@ -40,10 +40,13 @@ def parse_log_fn(_repo_name: str):
     return parse_log_pytest
 
 
-# Function to remove ANSI escape codes
-def decolor_dict_keys(key):
-    decolor = lambda key: re.sub(r"\u001b\[\d+m", "", key)
-    return {decolor(k): v for k, v in key.items()}
+def decolor_dict_keys(d: dict[str, str]) -> dict[str, str]:
+    """Strip ANSI escape codes from dict keys (pytest log keys)."""
+
+    def _strip_ansi(s: str) -> str:
+        return re.sub(r"\u001b\[\d+m", "", s)
+
+    return {_strip_ansi(k): v for k, v in d.items()}
 
 
 if __name__ == "__main__":

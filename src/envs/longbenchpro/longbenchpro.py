@@ -241,7 +241,7 @@ class LongBenchProIterativeJudgeEnv(vf.MultiTurnEnv):
         self._lbp_judge_rubric = judge_rubric
         super().__init__(**kwargs)
 
-    async def env_response(self, messages: vf.Messages, state: vf.State, **kwargs: Any) -> vf.Messages:
+    async def env_response(self, _messages: vf.Messages, state: vf.State, **_kwargs: Any) -> vf.Messages:
         last_completion = state["trajectory"][-1]["completion"]
         text = self._lbp_judge_rubric.parser.parse_answer(last_completion) or ""
         state["final_answer"] = text

@@ -19,3 +19,22 @@ dependencies = [
 
 [tool.uv]
 prerelease = "allow"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.9",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+# Focused set: correctness + import order + unused args (no broad B/SIM/UP churn on env code).
+select = ["E4", "E7", "E9", "F", "I", "ARG"]
+ignore = [
+    "E501", # line length
+]
+
+[tool.ruff.format]
+quote-style = "double"

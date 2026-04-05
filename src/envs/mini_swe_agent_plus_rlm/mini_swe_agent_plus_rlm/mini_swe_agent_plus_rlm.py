@@ -8,9 +8,6 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
-# Suppress httpx INFO logs
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
 import httpx
 import tenacity as tc
 import verifiers as vf
@@ -60,6 +57,9 @@ from .utils.sandbox_retry import (
 from .utils.swebench_utils import (
     get_logs_eval,
 )
+
+# Suppress httpx INFO logs (must run after httpx is imported)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 TOOLS_DIR = Path(__file__).resolve().parent.parent / "tools"
 EXECUTE_BASH = TOOLS_DIR / "execute_bash.py"
@@ -1203,7 +1203,7 @@ class DeepSweRubric(vf.Rubric):
         # If the caller wants the test output as well, return (reward, output)
         return reward
 
-    def solved(self, state: vf.State, info: vf.Info, **kwargs: Any) -> int:
+    def solved(self, state: vf.State, info: vf.Info, **_kwargs: Any) -> int:
         if isinstance(state.get("error"), vf.InfraError):
             return 0
         if state.get("max_execution_timeouts_reached"):
