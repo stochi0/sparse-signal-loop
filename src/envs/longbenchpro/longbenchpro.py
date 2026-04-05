@@ -1,8 +1,9 @@
 """
 LongBench-Pro long-context environment.
 
-The full context and question are delivered in the user message. Optional multi-turn
-loop: an LLM judge runs after every assistant turn (``verifiers.MultiTurnEnv``).
+The full context and question are delivered in the user message. With ``in_loop_judge``,
+an LLM judge runs **during** the rollout (after each assistant turn via ``verifiers.MultiTurnEnv``);
+otherwise judging is rubric-only at trajectory end (single-turn).
 
 Dataset: caskcsg/LongBench-Pro
 Reference: https://github.com/caskcsg/longcontext/tree/main/LongBench-Pro
@@ -34,7 +35,7 @@ Read the long context carefully. For retrieval-style tasks, note document struct
 before deep reading. Follow the answer format required by the question (e.g. [Answer] / [答案] markers when specified).
 </env_tips>"""
 
-ITERATIVE_JUDGE_INSTRUCTION_SUFFIX = """\n\nEach time you respond with an answer, an automatic judge compares it to \
+IN_LOOP_JUDGE_INSTRUCTION_SUFFIX = """\n\nEach time you respond with an answer, an automatic judge compares it to \
 the reference. If it is judged incorrect, you will receive concise feedback as the next user message. Revise and \
 respond again until the judge accepts your answer or you run out of turns."""
 
@@ -234,8 +235,8 @@ def _format_user_prompt(
     return f"{question_stem}\n\n## Long Context\n\n{raw_context}"
 
 
-class LongBenchProIterativeJudgeEnv(vf.MultiTurnEnv):
-    """LLM judge after every assistant turn (``MultiTurnEnv``)."""
+class LongBenchProInLoopJudgeEnv(vf.MultiTurnEnv):
+    """In-loop LLM judge: runs after each assistant message and returns feedback (``MultiTurnEnv``)."""
 
     def __init__(self, *, judge_rubric: JudgeRubric, **kwargs: Any):
         self._lbp_judge_rubric = judge_rubric
@@ -289,7 +290,7 @@ def load_environment(
     judge_base_url: str | None = None,
     judge_sampling_args: dict[str, Any] | None = None,
     judge_feedback_mode: JudgeFeedbackMode = "total_score",
-    iterative_judge: bool = True,
+    in_loop_judge: bool = True,
     max_turns: int = 8,
     **kwargs: Any,
 ) -> vf.Environment:
@@ -320,9 +321,10 @@ def load_environment(
         judge_feedback_mode: ``total_score`` (default): four 0/1 criterion lines plus ``TOTAL: x/4``; \
             ``single_criterion``: one ``VIOLATED: …`` line plus one feedback sentence (sparse signal). \
             Templates live in ``longbenchpro_prompts``.
-        iterative_judge: If True, judge after each assistant message (``max_turns`` cap). \
-            If False, single-turn rollout; judge only via rubric at the end.
-        max_turns: Max assistant messages when ``iterative_judge`` is True.
+        in_loop_judge: If True, run the LLM judge **during** the rollout after each assistant message \
+            (``max_turns`` cap) and surface feedback in chat. If False, single-turn rollout; the judge runs only \
+            via the rubric at trajectory end.
+        max_turns: Max assistant messages when ``in_loop_judge`` is True.
         **kwargs: Forwarded to ``SingleTurnEnv`` / ``MultiTurnEnv``.
     """
     question_column = "question_thinking" if thinking else "question_nonthinking"
@@ -336,8 +338,8 @@ def load_environment(
         question_stem = question
         if include_env_tips:
             question_stem = question_stem + _ENV_TIPS
-        if iterative_judge:
-            question_stem = question_stem + ITERATIVE_JUDGE_INSTRUCTION_SUFFIX
+        if in_loop_judge:
+            question_stem = question_stem + IN_LOOP_JUDGE_INSTRUCTION_SUFFIX
 
         user_content = _format_user_prompt(question_stem, raw_context, prompt_in_context_file=prompt_in_context_file)
 
@@ -451,7 +453,7 @@ def load_environment(
     judge_rubric.add_reward_func(task_metric_reward, weight=0.0)
     judge_rubric.add_reward_func(contains_answer_reward, weight=0.0)
 
-    if not iterative_judge:
+    if not in_loop_judge:
         return vf.SingleTurnEnv(
             dataset=build_dataset,
             eval_dataset=build_dataset,
@@ -459,7 +461,7 @@ def load_environment(
             **kwargs,
         )
 
-    return LongBenchProIterativeJudgeEnv(
+    return LongBenchProInLoopJudgeEnv(
         judge_rubric=judge_rubric,
         dataset=build_dataset,
         eval_dataset=build_dataset,

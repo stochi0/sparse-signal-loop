@@ -1,6 +1,6 @@
 [project]
 name = "longbenchpro"
-description = "LongBench-Pro long-context benchmark with context in the user message and optional iterative LLM judge"
+description = "LongBench-Pro long-context benchmark with context in the user message and optional in-loop LLM judge"
 tags = ["long-context", "multi-turn", "benchmark", "judge"]
 version = "0.1.5"
 requires-python = ">=3.11"

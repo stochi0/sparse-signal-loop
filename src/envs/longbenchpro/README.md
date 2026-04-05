@@ -15,7 +15,7 @@ Summarization tasks (T4.x) are excluded.
 - `total_score` (default): four 0/1 criterion lines plus `TOTAL: x/4`.
 - `single_criterion`: one `VIOLATED:` line plus one sentence.
 
-For iterative judging, set `iterative_judge: true` and tune `max_turns` for enough room to revise after feedback.
+For in-loop judging (judge feedback between turns), set `in_loop_judge: true` and tune `max_turns` for enough room to revise after feedback.
 
 ### Dataset
 
@@ -30,11 +30,11 @@ Rollout `info` includes `dataset_example_id` (the HuggingFace row `id`) for logg
 ```bash
 uv pip install -e ./environments/longbenchpro
 
-# Single rollout (iterative judge on by default)
+# Single rollout (in-loop judge on by default)
 uv run vf-eval longbenchpro -m gpt-5-mini -n 1 -r1 -d -v
 
 # Single-turn (judge only at end)
-uv run vf-eval longbenchpro -m gpt-5-mini -n 5 -a '{"iterative_judge": false}'
+uv run vf-eval longbenchpro -m gpt-5-mini -n 5 -a '{"in_loop_judge": false}'
 
 # User message as JSON {"query","context"} instead of markdown long-context section
 uv run vf-eval longbenchpro -m gpt-5-mini -n 3 -a '{"prompt_in_context_file": true}'
@@ -61,8 +61,8 @@ uv run vf-eval longbenchpro -m gpt-5-mini -n 3 -a '{"prompt_in_context_file": tr
 | `judge_base_url` | str \| None | `None` | Default: Prime Inference |
 | `judge_sampling_args` | dict \| None | `None` | Judge sampling kwargs |
 | `judge_feedback_mode` | str | `"total_score"` | `total_score` or `single_criterion` |
-| `iterative_judge` | bool | `True` | Multi-turn feedback vs single-turn |
-| `max_turns` | int | `8` | Max assistant messages when `iterative_judge` is true |
+| `in_loop_judge` | bool | `True` | In-loop judge + chat feedback vs single-turn (rubric-only at end) |
+| `max_turns` | int | `8` | Max assistant messages when `in_loop_judge` is true |
 
 ### Metrics
 
