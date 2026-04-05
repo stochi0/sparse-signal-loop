@@ -220,3 +220,5 @@ __marimo__/
 context/
 src/envs/*/outputs/
 outputs/
+.phase0_dry_run/
+.phase0_dry_run_lbp/

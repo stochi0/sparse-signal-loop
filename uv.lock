@@ -1170,6 +1170,40 @@ wheels = [
 ]
 
 [[package]]
+name = "longbenchpro"
+version = "0.1.5"
+source = { editable = "src/envs/longbenchpro" }
+dependencies = [
+    { name = "datasets" },
+    { name = "pytrec-eval-terrier" },
+    { name = "verifiers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datasets" },
+    { name = "pytrec-eval-terrier" },
+    { name = "verifiers", specifier = ">=0.1.12.dev1" },
+]
+
+[[package]]
+name = "longbenchpro-rlm"
+version = "0.1.5"
+source = { editable = "src/envs/longbenchpro_rlm" }
+dependencies = [
+    { name = "datasets" },
+    { name = "pytrec-eval-terrier" },
+    { name = "verifiers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datasets" },
+    { name = "pytrec-eval-terrier" },
+    { name = "verifiers", specifier = ">=0.1.12.dev1" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2758,11 +2792,13 @@ wheels = [
 [[package]]
 name = "sparse-signal-loop"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "datasets" },
     { name = "httpx" },
     { name = "jinja2" },
+    { name = "longbenchpro" },
+    { name = "longbenchpro-rlm" },
     { name = "numpy" },
     { name = "prime-sandboxes" },
     { name = "pytrec-eval-terrier" },
@@ -2782,6 +2818,8 @@ requires-dist = [
     { name = "datasets" },
     { name = "httpx" },
     { name = "jinja2" },
+    { name = "longbenchpro", editable = "src/envs/longbenchpro" },
+    { name = "longbenchpro-rlm", editable = "src/envs/longbenchpro_rlm" },
     { name = "numpy" },
     { name = "prime-sandboxes", specifier = ">=0.2.13" },
     { name = "pytrec-eval-terrier" },
