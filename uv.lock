@@ -1353,6 +1353,64 @@ wheels = [
 ]
 
 [[package]]
+name = "mini-swe-agent-plus"
+version = "0.2.21"
+source = { editable = "src/envs/mini_swe_agent_plus" }
+dependencies = [
+    { name = "datasets" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "numpy" },
+    { name = "prime-sandboxes" },
+    { name = "requests" },
+    { name = "swebench" },
+    { name = "tenacity" },
+    { name = "verifiers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datasets" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "numpy" },
+    { name = "prime-sandboxes", specifier = ">=0.2.13" },
+    { name = "requests" },
+    { name = "swebench", specifier = "==4.1.0" },
+    { name = "tenacity" },
+    { name = "verifiers", specifier = ">=0.1.12.dev1" },
+]
+
+[[package]]
+name = "mini-swe-agent-plus-rlm"
+version = "0.1.6"
+source = { editable = "src/envs/mini_swe_agent_plus_rlm" }
+dependencies = [
+    { name = "datasets" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "numpy" },
+    { name = "prime-sandboxes" },
+    { name = "requests" },
+    { name = "swebench" },
+    { name = "tenacity" },
+    { name = "verifiers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datasets" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "numpy" },
+    { name = "prime-sandboxes", specifier = ">=0.2.13" },
+    { name = "requests" },
+    { name = "swebench", specifier = "==4.1.0" },
+    { name = "tenacity" },
+    { name = "verifiers", specifier = ">=0.1.12.dev1" },
+]
+
+[[package]]
 name = "modal"
 version = "1.4.2.dev4"
 source = { registry = "https://pypi.org/simple" }
@@ -2799,6 +2857,8 @@ dependencies = [
     { name = "jinja2" },
     { name = "longbenchpro" },
     { name = "longbenchpro-rlm" },
+    { name = "mini-swe-agent-plus" },
+    { name = "mini-swe-agent-plus-rlm" },
     { name = "numpy" },
     { name = "prime-sandboxes" },
     { name = "pytrec-eval-terrier" },
@@ -2820,6 +2880,8 @@ requires-dist = [
     { name = "jinja2" },
     { name = "longbenchpro", editable = "src/envs/longbenchpro" },
     { name = "longbenchpro-rlm", editable = "src/envs/longbenchpro_rlm" },
+    { name = "mini-swe-agent-plus", editable = "src/envs/mini_swe_agent_plus" },
+    { name = "mini-swe-agent-plus-rlm", editable = "src/envs/mini_swe_agent_plus_rlm" },
     { name = "numpy" },
     { name = "prime-sandboxes", specifier = ">=0.2.13" },
     { name = "pytrec-eval-terrier" },

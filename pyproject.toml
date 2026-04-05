@@ -17,6 +17,8 @@ dependencies = [
     "jinja2",
     "longbenchpro",
     "longbenchpro-rlm",
+    "mini-swe-agent-plus",
+    "mini-swe-agent-plus-rlm",
     "numpy",
     "prime-sandboxes>=0.2.13",
     "pytrec-eval-terrier",
@@ -29,9 +31,12 @@ dependencies = [
 [tool.uv.sources]
 longbenchpro = { path = "src/envs/longbenchpro", editable = true }
 longbenchpro-rlm = { path = "src/envs/longbenchpro_rlm", editable = true }
+mini-swe-agent-plus = { path = "src/envs/mini_swe_agent_plus", editable = true }
+mini-swe-agent-plus-rlm = { path = "src/envs/mini_swe_agent_plus_rlm", editable = true }
 
 [project.scripts]
 ssl-phase0-lbp = "experiments.phase0_lbp.cli:main"
+ssl-phase0-msap = "experiments.phase0_mini_swe.cli:main"
 
 [tool.uv]
 prerelease = "allow"

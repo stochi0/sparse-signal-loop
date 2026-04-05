@@ -1,1 +1,1 @@
-"""Research / evaluation harnesses (e.g. ``phase0_lbp``)."""
+"""Research / evaluation harnesses (e.g. ``phase0_lbp``, ``phase0_mini_swe``)."""
