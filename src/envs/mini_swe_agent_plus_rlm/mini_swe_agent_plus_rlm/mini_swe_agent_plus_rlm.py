@@ -38,7 +38,7 @@ from verifiers.rubrics.judge_rubric import JudgeRubric
 from verifiers.types import ClientConfig, ToolMessage
 
 from .mini_swe_judge_prompts import (
-    REPL_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX,
+    REPL_IN_LOOP_JUDGE_INSTRUCTION_SUFFIX,
     JudgeFeedbackMode,
     swe_judge_prompt_for_mode,
 )
@@ -1077,19 +1077,19 @@ print(json.dumps({{"digest": digest, "count": len(items)}}))
         return False
 
 
-class MiniSweAgentPlusRLMJudgeEnv(MiniSweAgentPlusRLMEnv):
-    """SWE env with LLM judge gated on REPL submit (``final_answer`` / ``answer['ready']``)."""
+class MiniSweAgentPlusRLMInLoopJudgeEnv(MiniSweAgentPlusRLMEnv):
+    """SWE RLM env with in-loop LLM judge on REPL submit (``final_answer`` / ``answer['ready']``)."""
 
     def __init__(
         self,
         *,
         judge_rubric: JudgeRubric,
-        iterative_judge: bool,
+        in_loop_judge: bool,
         max_judge_submissions: int,
         **kwargs: Any,
     ) -> None:
         self._msap_judge_rubric = judge_rubric
-        self._msap_iterative_judge = iterative_judge
+        self._msap_in_loop_judge = in_loop_judge
         self._msap_max_judge_submissions = max_judge_submissions
         super().__init__(**kwargs)
 
@@ -1114,7 +1114,7 @@ class MiniSweAgentPlusRLMJudgeEnv(MiniSweAgentPlusRLMEnv):
 
     async def env_response(self, messages: vf.Messages, state: vf.State, **kwargs: Any) -> vf.Messages:
         tool_messages = await super().env_response(messages, state, **kwargs)
-        if not self._msap_iterative_judge or "final_answer" not in state:
+        if not self._msap_in_loop_judge or "final_answer" not in state:
             return tool_messages
 
         declared = (state.get("final_answer") or "").strip()
@@ -1251,7 +1251,7 @@ def load_environment(
     use_dataset_cache: bool = False,
     custom_instructions: str = "",
     logger: Any = None,
-    iterative_judge: bool = False,
+    in_loop_judge: bool = False,
     max_judge_submissions: int = 8,
     judge_model: str = _DEFAULT_PRIME_JUDGE_MODEL,
     judge_api_key_var: str = "PRIME_API_KEY",
@@ -1312,7 +1312,7 @@ def load_environment(
         use_dataset_cache: Use HuggingFace dataset caching instead of in-memory.
         custom_instructions: Extra instructions appended to each prompt in a
             <custom_instructions> block. Empty string (default) adds nothing.
-        iterative_judge: If True, run an LLM judge when the model submits from the REPL;
+        in_loop_judge: If True, run an LLM judge **during** the rollout when the model submits from the REPL;
             wrong submissions get feedback (see README). Default False (no judge client).
         max_judge_submissions: Max incorrect judge outcomes before the rollout ends.
         judge_model: Judge chat model id (OpenAI-compatible / Prime Inference).
@@ -1320,14 +1320,14 @@ def load_environment(
         judge_base_url: Judge API base URL; default Prime Inference.
         judge_sampling_args: Optional extra args for judge ``chat.completions.create``.
         judge_feedback_mode: ``total_score`` (default; four 0/1 criteria + ``TOTAL: x/4``) or \
-            ``single_criterion`` (one ``VIOLATED: …`` line + one sentence); only used when ``iterative_judge`` is True.
+            ``single_criterion`` (one ``VIOLATED: …`` line + one sentence); only used when ``in_loop_judge`` is True.
         logger: Optional logger instance.
     """
     split = "test" if "bench" in dataset_name.lower() else "train"
 
-    if iterative_judge and max_turns < 50:
+    if in_loop_judge and max_turns < 50:
         logging.getLogger(__name__).warning(
-            "iterative_judge=True but max_turns=%d is low; use more headroom (e.g. 80–200) for submit + judge NO + "
+            "in_loop_judge=True but max_turns=%d is low; use more headroom (e.g. 80–200) for submit + judge NO + "
             "REPL recovery before max_turns.",
             max_turns,
         )
@@ -1340,8 +1340,8 @@ def load_environment(
     repl_tool_name = "call_bash_repl" if repl_language == "bash" else "call_python_repl"
 
     ci_effective = custom_instructions.strip() if custom_instructions else ""
-    if iterative_judge:
-        ij = REPL_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX.strip()
+    if in_loop_judge:
+        ij = REPL_IN_LOOP_JUDGE_INSTRUCTION_SUFFIX.strip()
         ci_effective = f"{ci_effective}\n\n{ij}" if ci_effective else ij
 
     def build_dataset():
@@ -1381,7 +1381,7 @@ def load_environment(
         harness=harness,
     )
 
-    if iterative_judge:
+    if in_loop_judge:
         judge_client_config = ClientConfig(
             client_type="openai_chat_completions",
             api_key_var=judge_api_key_var,
@@ -1424,7 +1424,7 @@ def load_environment(
 
         judge_rubric.add_reward_func(judge_reward, weight=0.0)
         rubric = judge_rubric
-        env_cls = MiniSweAgentPlusRLMJudgeEnv
+        env_cls = MiniSweAgentPlusRLMInLoopJudgeEnv
     else:
         rubric = deep_rubric
         env_cls = MiniSweAgentPlusRLMEnv
@@ -1454,9 +1454,9 @@ def load_environment(
         rlm_metric_weights=rlm_metric_weights,
         logger=logger,
     )
-    if iterative_judge:
+    if in_loop_judge:
         env_kwargs["judge_rubric"] = judge_rubric
-        env_kwargs["iterative_judge"] = True
+        env_kwargs["in_loop_judge"] = True
         env_kwargs["max_judge_submissions"] = max_judge_submissions
 
     return env_cls(**env_kwargs, **kwargs)

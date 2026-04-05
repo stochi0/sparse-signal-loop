@@ -6,7 +6,7 @@ from typing import Literal
 
 JudgeFeedbackMode = Literal["total_score", "single_criterion"]
 
-REPL_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX = """\n\n**Iterative judge:** Setting ``answer[\"ready\"] = True`` (or ``RLM_READY=1`` in bash) \
+REPL_IN_LOOP_JUDGE_INSTRUCTION_SUFFIX = """\n\n**In-loop judge:** Setting ``answer[\"ready\"] = True`` (or ``RLM_READY=1`` in bash) \
 submits your current ``answer[\"content\"]`` plus ``git diff`` to an LLM judge. If the judge says NO, the REPL output \
 includes a ``--- Judge ---`` block with feedback — revise in the REPL (edits, tests), then set ``ready`` again. Repeat \
 until YES or you exhaust wrong submissions. Budget root turns so you can still recover after at least one rejection."""

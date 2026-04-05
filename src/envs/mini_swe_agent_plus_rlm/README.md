@@ -35,7 +35,7 @@ Supported harnesses and datasets:
 - **Protected files**: Modifying test/config files yields a reward of 0 and tests are skipped.
 
 ### Iterative LLM judge
-Set `iterative_judge` to **true** to run an LLM judge when the model submits from the REPL (`answer["ready"] = True` or bash `RLM_READY` when required by the harness). The judge sees the declared final answer plus `git diff` and the dataset gold `patch` when present. If the judge says **NO**, feedback is appended to the REPL tool result, `final_answer` is cleared, and the root model can continue until `max_judge_submissions` wrong attempts. **Primary reward remains** test-based `solved` (weight 1.0); `judge_reward` is weight 0.0 for diagnostics. Default is **false** (no judge API).
+Set `in_loop_judge` to **true** to run an LLM judge when the model submits from the REPL (`answer["ready"] = True` or bash `RLM_READY` when required by the harness). The judge sees the declared final answer plus `git diff` and the dataset gold `patch` when present. If the judge says **NO**, feedback is appended to the REPL tool result, `final_answer` is cleared, and the root model can continue until `max_judge_submissions` wrong attempts. **Primary reward remains** test-based `solved` (weight 1.0); `judge_reward` is weight 0.0 for diagnostics. Default is **false** (no judge API).
 
 ### Quickstart
 
@@ -87,13 +87,13 @@ Notes:
 | `rlm_metric_weights` | dict[str, float] | `None` | Override weights for harness monitor metrics as training reward signals. See below. |
 | `use_dataset_cache` | bool | `False` | Use HuggingFace dataset caching instead of keeping data in memory |
 | `custom_instructions` | str | `""` | Extra instructions appended to each prompt in a `<custom_instructions>` block. Empty string adds nothing. |
-| `iterative_judge` | bool | `False` | LLM judge on each REPL final submission when true |
+| `in_loop_judge` | bool | `False` | LLM judge on each REPL final submission when true |
 | `max_judge_submissions` | int | `8` | Max incorrect submissions before the rollout is forced to end |
 | `judge_model` | str | `openai/gpt-4.1-mini` | Judge model id (Prime Inference–style) |
 | `judge_api_key_var` | str | `PRIME_API_KEY` | Env var for judge API key |
 | `judge_base_url` | str | `None` | OpenAI-compatible base URL (default Prime Inference) |
 | `judge_sampling_args` | dict | `None` | Optional sampling args for the judge chat call |
-| `judge_feedback_mode` | str | `total_score` | When `iterative_judge` is true: `total_score` or `single_criterion` (criteria `PROBLEM_FIT`, `PATCH_QUALITY`, `SCOPE`, `VERIFICATION`). |
+| `judge_feedback_mode` | str | `total_score` | When `in_loop_judge` is true: `total_score` or `single_criterion` (criteria `PROBLEM_FIT`, `PATCH_QUALITY`, `SCOPE`, `VERIFICATION`). |
 
 #### Timeout design
 
