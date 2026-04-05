@@ -1024,7 +1024,7 @@ class DeepSweSandboxEnv(vf.SandboxEnv):
 
 
 class DeepSweSandboxJudgeEnv(DeepSweSandboxEnv):
-    """Sandbox SWE env with optional LLM judge gated on ``MINI_SWE_AGENT_FINAL_OUTPUT`` (like RLM submit-gated judges)."""
+    """Sandbox SWE env with optional LLM judge gated on ``MINI_SWE_AGENT_FINAL_OUTPUT``."""
 
     def __init__(
         self,

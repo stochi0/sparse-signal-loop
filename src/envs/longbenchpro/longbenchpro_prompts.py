@@ -1,7 +1,4 @@
-"""LLM judge prompts for the LongBench-Pro chat environment (``longbenchpro``).
-
-Keep judge text aligned with ``longbenchpro_rlm_prompts`` in the RLM package when changing feedback modes.
-"""
+"""LLM judge prompts for the LongBench-Pro environment (``longbenchpro``)."""
 
 from __future__ import annotations
 

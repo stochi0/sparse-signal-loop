@@ -5,7 +5,7 @@ def render_template(template: str, **kwargs) -> str:
     return Template(template, undefined=StrictUndefined).render(**kwargs)
 
 
-PROMPT_TEMPLATE_RLM = """<pr_description>
+REPL_PROMPT_TEMPLATE = """<pr_description>
 
 Consider the following PR description:
 
@@ -15,9 +15,9 @@ Consider the following PR description:
 
 <instructions>
 
-# Task Instructions (RLM)
+# Task Instructions (REPL)
 
-You are operating in an RLM environment. Use the `{repl_tool_name}` tool to run code
+You are operating in a REPL-backed coding environment. Use the `{repl_tool_name}` tool to run code
 iteratively. The REPL preserves state across calls.
 
 ## Important Boundaries

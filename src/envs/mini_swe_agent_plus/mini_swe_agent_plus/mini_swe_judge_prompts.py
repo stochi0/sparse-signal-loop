@@ -1,10 +1,4 @@
-"""LLM judge prompts for mini-swe-agent-plus (non-RLM, tool-loop).
-
-Align wording with ``mini_swe_judge_prompts`` in the RLM package when changing behavior.
-
-This module only embeds the **chat / echo-submit** submission line. The RLM env uses a different
-one-liner for ``{{response}}`` — see ``mini_swe_agent_plus_rlm/.../mini_swe_judge_prompts.py``.
-"""
+"""LLM judge prompts for the mini-swe-agent-plus environment."""
 
 from __future__ import annotations
 

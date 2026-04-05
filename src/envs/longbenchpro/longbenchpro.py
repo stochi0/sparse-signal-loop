@@ -1,9 +1,8 @@
 """
-LongBench-Pro long-context environment (non-RLM).
+LongBench-Pro long-context environment.
 
-Same dataset, judge, and task metrics as ``longbenchpro_rlm``, but the model receives
-the full task in chat messages (no REPL / sandbox). Optional multi-turn loop: an LLM
-judge runs after every assistant turn (``verifiers.MultiTurnEnv``).
+The full context and question are delivered in the user message. Optional multi-turn
+loop: an LLM judge runs after every assistant turn (``verifiers.MultiTurnEnv``).
 
 Dataset: caskcsg/LongBench-Pro
 Reference: https://github.com/caskcsg/longcontext/tree/main/LongBench-Pro
@@ -26,7 +25,7 @@ from verifiers.rubrics.judge_rubric import JudgeRubric
 from verifiers.types import ClientConfig, UserMessage
 
 # =============================================================================
-# Environment tips (no REPL — avoid RLM-only workflow hints)
+# Environment tips
 # =============================================================================
 
 _ENV_TIPS = """
@@ -47,7 +46,7 @@ _DEFAULT_PRIME_JUDGE_MODEL = "openai/gpt-4.1-mini"
 
 
 # =============================================================================
-# Task-specific metrics (same as LongBench-Pro / longbenchpro_rlm)
+# Task-specific metrics (LongBench-Pro)
 # =============================================================================
 
 
@@ -224,7 +223,7 @@ def _format_user_prompt(
     *,
     prompt_in_context_file: bool,
 ) -> str:
-    """Inline full context in chat (no sandbox file). ``prompt_in_context_file`` mirrors RLM JSON shape."""
+    """Inline full context in the user message (no context file). If ``prompt_in_context_file``, use a JSON object with ``query`` and ``context`` keys."""
     if prompt_in_context_file:
         payload = json.dumps({"query": question_stem, "context": raw_context}, ensure_ascii=False)
         return (
@@ -236,7 +235,7 @@ def _format_user_prompt(
 
 
 class LongBenchProIterativeJudgeEnv(vf.MultiTurnEnv):
-    """LLM judge after every assistant turn (``MultiTurnEnv`` chat pattern)."""
+    """LLM judge after every assistant turn (``MultiTurnEnv``)."""
 
     def __init__(self, *, judge_rubric: JudgeRubric, **kwargs: Any):
         self._lbp_judge_rubric = judge_rubric
@@ -295,18 +294,17 @@ def load_environment(
     **kwargs: Any,
 ) -> vf.Environment:
     """
-    Load LongBench-Pro as a standard chat environment (no RLM).
+    Load LongBench-Pro with context and question in the user message.
 
-    Context is always included in the user message. ``prompt_in_context_file`` controls
-    whether that content uses the same JSON layout as the RLM ``context.txt`` payload
-    (inline JSON) versus question plus a ``## Long Context`` section.
+    ``prompt_in_context_file`` selects either a single JSON object (``query`` and ``context``)
+    or the query stem plus a ``## Long Context`` section.
 
     Args:
         split: Dataset split (LongBench-Pro only has ``\"test\"``).
         shuffle: Whether to shuffle the dataset.
         seed: Random seed for shuffling.
         thinking: If True, use ``question_thinking``; otherwise ``question_nonthinking``.
-        include_env_tips: Append non-RLM strategy tips to the query stem.
+        include_env_tips: Append optional reading-strategy tips to the query stem.
         prompt_in_context_file: If True, one JSON object with ``query`` and ``context``; \
             if False, query stem plus a markdown long-context section.
         language: ``\"English\"``, ``\"Chinese\"``, or ``\"all\"``.
@@ -314,21 +312,17 @@ def load_environment(
         difficulty: Filter by difficulty or ``\"all\"``.
         primary_task: Optional primary task filter.
         secondary_task: Optional secondary task filter.
-        dataset_start_index: Skip the first N rows after filters and transform (same semantics as \
-            ``mini_swe_agent_plus`` / ``mini_swe_agent_plus_rlm``). Use ``shuffle: false`` and the same \
-            index in chat and RLM for paired evals.
+        dataset_start_index: Skip the first N rows after filters and transform.
         judge_model: Judge model id on Prime Inference (e.g. ``openai/gpt-4.1-mini`` or ``z-ai/glm-4.7``).
         judge_api_key_var: Env var for the judge API key.
         judge_base_url: API base URL; default Prime Inference.
         judge_sampling_args: Optional sampling args for the judge.
         judge_feedback_mode: ``freeform`` (default): concise multi-line feedback after NO; ``total_score``: \
             four 0/1 criterion lines plus ``TOTAL: x/4``; ``single_criterion``: one ``VIOLATED: …`` line plus \
-            one feedback sentence (sparse signal). Prompts live in ``longbenchpro_prompts``; keep in sync with \
-            ``longbenchpro_rlm_prompts`` in the RLM package.
+            one feedback sentence (sparse signal). Templates live in ``longbenchpro_prompts``.
         iterative_judge: If True, judge after each assistant message (``max_turns`` cap). \
             If False, single-turn rollout; judge only via rubric at the end.
-        max_turns: Max assistant messages when ``iterative_judge`` is True. For parity with ``longbenchpro_rlm``, \
-            align with ``max_judge_submissions`` (graded incorrect attempts).
+        max_turns: Max assistant messages when ``iterative_judge`` is True.
         **kwargs: Forwarded to ``SingleTurnEnv`` / ``MultiTurnEnv``.
     """
     question_column = "question_thinking" if thinking else "question_nonthinking"

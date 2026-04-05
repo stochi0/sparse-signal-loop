@@ -3,24 +3,24 @@
 ### Overview
 
 - **Environment ID**: `longbenchpro-rlm`
-- **Short description**: LongBench-Pro long-context benchmark using RLM (Recursive Language Model) with Python REPL
-- **Tags**: long-context, rlm, python, multi-turn, repl
+- **Short description**: LongBench-Pro long-context benchmark with a sandbox code REPL (recursive harness from `verifiers`).
+- **Tags**: long-context, python, multi-turn, repl
 
-### How It Works
+### How it works
 
-This environment implements the [LongBench-Pro benchmark](https://github.com/caskcsg/longcontext/tree/main/LongBench-Pro) for evaluating long-context understanding capabilities using the `RLMEnv`.
+This environment runs [LongBench-Pro](https://github.com/caskcsg/longcontext/tree/main/LongBench-Pro) with an interactive REPL so the model can execute code against the context and submit a final answer.
 
-LongBench-Pro contains 1,500 examples spanning 11 primary task categories and 25 secondary tasks, with context lengths from 8k to 256k tokens. Tasks include retrieval, ranking, QA, clustering, anomaly detection, and more.
+LongBench-Pro contains 1,500 examples spanning 11 primary task categories and 25 secondary tasks, with context lengths from 8k to 256k tokens.
 
-**Note:** Summarization tasks (T4.x) are excluded from this environment because their metrics require model-based embeddings that are impractical in this evaluation setting.
+**Note:** Summarization tasks (T4.x) are excluded because their metrics require model-based embeddings that are impractical in this evaluation setting.
 
 ### Dataset
 
-- [caskcsg/LongBench-Pro](https://huggingface.co/datasets/caskcsg/LongBench-Pro) - 1,500 bilingual long-context evaluation tasks
+- [caskcsg/LongBench-Pro](https://huggingface.co/datasets/caskcsg/LongBench-Pro) — 1,500 bilingual long-context evaluation tasks
 
-By default, this environment loads **English-only** examples (~750 samples). Set `language: "Chinese"` for Chinese or `language: "all"` for both.
+By default, **English-only** examples (~750 samples). Set `language: "Chinese"` or `"all"` to change.
 
-Judge prompts live in `longbenchpro_rlm_prompts.py` (mirror of `longbenchpro_prompts.py` in `longbenchpro`; edit both when changing wording). See the `longbenchpro` README for the 2×2 experiment table and **paired eval** commands (same `dataset_start_index` + `judge_feedback_mode` vs chat).
+Judge prompt templates live in `longbenchpro_rlm_prompts.py`.
 
 ### Quickstart
 
@@ -45,7 +45,7 @@ uv run vf-eval longbenchpro-rlm -m gpt-5-mini -n 5 -a '{"difficulty": "Hard"}'
 uv run vf-eval longbenchpro-rlm -m gpt-5-mini -n 5 -a '{"secondary_task": "T3.2 Single-Hop Fact QA"}'
 ```
 
-### Environment Arguments
+### Environment arguments
 
 | Arg | Type | Default | Description |
 | --- | ---- | ------- | ----------- |
@@ -54,14 +54,14 @@ uv run vf-eval longbenchpro-rlm -m gpt-5-mini -n 5 -a '{"secondary_task": "T3.2 
 | `seed` | int \| None | `None` | Random seed for shuffling; if `None`, picks a random seed |
 | `thinking` | bool | `False` | If True, use `question_thinking` prompts; otherwise `question_nonthinking` |
 | `include_env_tips` | bool | `False` | Include strategy tips in prompt |
-| `prompt_in_context_file` | bool | `False` | if `False`, the query will be directly in context, and the extra info in a file; if `True`, both will be in a file (in a structured manner; it's a dict `{"query": prompt, "context": context}` which is json-serialized and written into *context.txt*) |
-| `language` | str | `"English"` | Filter by language: "English", "Chinese", or "all" |
-| `token_length` | str | `"all"` | Filter by token length: "8k", "16k", "32k", "64k", "128k", "256k", or "all" |
-| `difficulty` | str | `"all"` | Filter by difficulty: "Easy", "Moderate", "Hard", "Extreme", or "all" |
+| `prompt_in_context_file` | bool | `False` | If `False`, the query is in context and extra info in a file; if `True`, both in a file as JSON in `context.txt` |
+| `language` | str | `"English"` | Filter: "English", "Chinese", or "all" |
+| `token_length` | str | `"all"` | Filter: "8k", "16k", "32k", "64k", "128k", "256k", or "all" |
+| `difficulty` | str | `"all"` | Filter: "Easy", "Moderate", "Hard", "Extreme", or "all" |
 | `primary_task` | str \| None | `None` | Filter by primary task (e.g., "T1. Retrieval & Ranking") |
 | `secondary_task` | str \| None | `None` | Filter by secondary task (e.g., "T3.2 Single-Hop Fact QA") |
-| `dataset_start_index` | int | `0` | Skip first N rows after filters and transform (same as `longbenchpro` / `mini-swe-agent-plus-rlm`) |
-| `repl_language` | Literal["bash", "python"] | `"python"` | The RLM execution language ("bash" or "python") |
+| `dataset_start_index` | int | `0` | Skip first N rows after filters and transform |
+| `repl_language` | Literal["bash", "python"] | `"python"` | REPL language |
 | `judge_model` | str | `"openai/gpt-4.1-mini"` | Judge model on Prime Inference (OpenAI-compatible id) |
 | `judge_api_key_var` | str | `"PRIME_API_KEY"` | Env var for judge API key (Prime Inference) |
 | `judge_base_url` | str \| None | `None` | Judge API base URL; if `None`, uses Prime Inference `https://api.pinference.ai/api/v1` |
@@ -85,7 +85,7 @@ uv run vf-eval longbenchpro-rlm -m gpt-5-mini -n 5 -a '{"secondary_task": "T3.2 
 | `sandbox_gpu_count` | int | `0` | Number of GPUs for sandbox |
 | `sandbox_timeout_minutes` | int | `60` | Overall sandbox lifetime in minutes |
 
-### Task Categories
+### Task categories
 
 LongBench-Pro covers 11 primary tasks with 25 secondary tasks. Summarization tasks (T4.x) are excluded.
 
@@ -113,10 +113,10 @@ LongBench-Pro covers 11 primary tasks with 25 secondary tasks. Summarization tas
 
 ### Changelog
 
-- 0.1.5: Removed `lbp_id` loader arg; rollout `info` uses `dataset_example_id` (same as `longbenchpro`).
-- 0.1.4: `dataset_start_index` (same as `longbenchpro` / MSAP RLM).
-- 0.1.3: `lbp_id` filter (same as `longbenchpro`); see `longbenchpro` README for paired eval commands.
-- 0.1.2: Dedicated `longbenchpro_rlm_prompts.py` (RLM package no longer depends on `longbenchpro`); keep wording aligned with `longbenchpro_prompts.py` in chat.
-- 0.1.1: `judge_feedback_mode` for dense vs sparse judge feedback (see `longbenchpro` README for 2×2).
-- 0.1.0: Initial release (excludes T4.x summarization tasks)
-- Judge client is created via verifiers `resolve_client` / `ClientConfig` (`openai_chat_completions`). Submit-gated iterative judge uses `JudgeRubric.judge` in `LongBenchProRLMEnv` (feedback on incorrect REPL submissions).
+- 0.1.5: Removed `lbp_id` loader arg; rollout `info` uses `dataset_example_id`.
+- 0.1.4: `dataset_start_index`.
+- 0.1.3: `lbp_id` filter.
+- 0.1.2: Dedicated `longbenchpro_rlm_prompts.py` in this package.
+- 0.1.1: `judge_feedback_mode` for dense vs sparse judge feedback.
+- 0.1.0: Initial release (excludes T4.x summarization tasks).
+- Judge client uses verifiers `resolve_client` / `ClientConfig` (`openai_chat_completions`). Submit-gated iterative judge uses `JudgeRubric.judge` in `LongBenchProRLMEnv`.

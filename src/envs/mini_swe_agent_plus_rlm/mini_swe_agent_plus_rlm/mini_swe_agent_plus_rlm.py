@@ -41,14 +41,14 @@ from verifiers.rubrics.judge_rubric import JudgeRubric
 from verifiers.types import ClientConfig, ToolMessage
 
 from .mini_swe_judge_prompts import (
-    RLM_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX,
+    REPL_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX,
     JudgeFeedbackMode,
     swe_judge_prompt_for_mode,
 )
 from .utils.execution_log_parser import decolor_dict_keys, parse_log_fn
 from .utils.prompts import (
     ACTION_OBSERVATION_TEMPLATE,
-    PROMPT_TEMPLATE_RLM,
+    REPL_PROMPT_TEMPLATE,
     render_template,
 )
 from .utils.sandbox_retry import (
@@ -189,7 +189,7 @@ _ALLOWED_RLM_METRICS = frozenset(
 
 
 class NormalizedRLMMetricRubric(vf.Rubric):
-    """Group rubric that min-max normalizes RLM metrics within a batch.
+    """Group rubric that min-max normalizes harness monitor metrics within a batch.
 
     Each metric is normalized to [0, 1] across the group:
     - Best-in-group gets 1.0, worst gets 0.0.
@@ -367,7 +367,7 @@ class MiniSweAgentPlusRLMEnv(RLMEnv):
                 raise ValueError(f"Unknown rlm_metric_weights keys: {bad}. Allowed: {sorted(_ALLOWED_RLM_METRICS)}")
             self.add_rubric(NormalizedRLMMetricRubric(metric_weights=rlm_metric_weights))
 
-        # The repo is already on the Docker image; skip the generic RLM
+        # The repo is already on the Docker image; skip the generic harness
         # _upload_directory call that tars up an empty local dir and extracts
         # it into /testbed (a wasted round-trip).
         self._executor._upload_directory = self._noop_upload_directory
@@ -792,7 +792,7 @@ print(json.dumps({{"digest": digest, "count": len(items)}}))
         )
 
     async def on_sandbox_ready(self, state: vf.State, sandbox_id: str) -> None:
-        """Prepare the repo and tools before the RLM worker starts."""
+        """Prepare the repo and tools before the REPL worker starts."""
         docker_image = state.get("info", {}).get("docker_image", "unknown")
         self.logger.info(f"Setting up state for docker image: {docker_image}")
         try:
@@ -1028,7 +1028,7 @@ print(json.dumps({{"digest": digest, "count": len(items)}}))
             return False
 
     async def _recover_from_code_timeout(self, state: vf.State) -> bool:
-        """Count RLM code-execution timeouts like sandbox command timeouts."""
+        """Count REPL code-execution timeouts like sandbox command timeouts."""
         state["command_timeout_count"] = state.get("command_timeout_count", 0) + 1
         return await super()._recover_from_code_timeout(state)
 
@@ -1078,7 +1078,7 @@ print(json.dumps({{"digest": digest, "count": len(items)}}))
 
 
 class MiniSweAgentPlusRLMJudgeEnv(MiniSweAgentPlusRLMEnv):
-    """RLM SWE env with LLM judge gated on REPL submit (``final_answer`` / ``answer['ready']``)."""
+    """SWE env with LLM judge gated on REPL submit (``final_answer`` / ``answer['ready']``)."""
 
     def __init__(
         self,
@@ -1278,7 +1278,7 @@ def load_environment(
         Derived timeouts (not user-facing):
             rollout_timeout_seconds = sandbox_timeout_minutes * 60 - test_timeout - 300
             sandbox_command_timeout = code_execution_timeout
-            sub_llm_timeout = code_execution_timeout - 5  (set by RLMEnv)
+            sub_llm_timeout = code_execution_timeout - 5  (set by the recursive harness base class)
 
         Power-user overrides:
             max_startup_wait_seconds: Timeout for infrastructure commands like pip install,
@@ -1307,8 +1307,8 @@ def load_environment(
         tools_on_sub: Make execute_bash/edit_via_str_replace available to sub-LLMs.
         include_sub_llm_in_trajectory: Include sub-LLM turns in trajectory.
         sub_model: Optional model override for sub-LLMs.
-        repl_language: RLM REPL language (python or bash).
-        rlm_metric_weights: Override weights for RLM monitor metrics.
+        repl_language: REPL language (python or bash).
+        rlm_metric_weights: Override weights for harness monitor metrics.
         use_dataset_cache: Use HuggingFace dataset caching instead of in-memory.
         custom_instructions: Extra instructions appended to each prompt in a
             <custom_instructions> block. Empty string (default) adds nothing.
@@ -1341,7 +1341,7 @@ def load_environment(
 
     ci_effective = custom_instructions.strip() if custom_instructions else ""
     if iterative_judge:
-        ij = RLM_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX.strip()
+        ij = REPL_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX.strip()
         ci_effective = f"{ci_effective}\n\n{ij}" if ci_effective else ij
 
     def build_dataset():
@@ -1359,7 +1359,7 @@ def load_environment(
             _process_example,
             remove_columns=ds.column_names,
             fn_kwargs={
-                "prompt_template": PROMPT_TEMPLATE_RLM,
+                "prompt_template": REPL_PROMPT_TEMPLATE,
                 "repl_tool_name": repl_tool_name,
                 "custom_instructions": ci_effective,
             },

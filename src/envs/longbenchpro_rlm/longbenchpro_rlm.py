@@ -1,11 +1,7 @@
 """
-LongBench-Pro Long-Context RLM Environment.
+LongBench-Pro long-context environment with an interactive code REPL.
 
-Implements the LongBench-Pro benchmark for evaluating long-context understanding
-capabilities of language models using the RLM (Recursive Language Model) pattern.
-
-The model operates in a Python REPL environment where it can write code to
-efficiently explore the large context and find information.
+The model can run code in a sandbox to explore a large context and submit a final answer.
 
 Dataset: caskcsg/LongBench-Pro (1500 examples across various long-context tasks)
 Reference: https://github.com/caskcsg/longcontext/tree/main/LongBench-Pro
@@ -44,8 +40,8 @@ Strategy for long-context information retrieval:
 4. Aggregate the relevant findings from the responses
 </env_tips>"""
 
-# When iterative_judge is on, explain submit-gated judging (same idea as other RLM envs).
-RLM_JUDGE_INSTRUCTION_SUFFIX = """\n\nWhen you submit a final answer from the REPL (answer['ready'] = True in Python, \
+# When iterative_judge is on, explain submit-gated judging for REPL workflows.
+REPL_SUBMIT_JUDGE_SUFFIX = """\n\nWhen you submit a final answer from the REPL (answer['ready'] = True in Python, \
 or ANSWER_READY=1 in bash), the environment runs the judge on that submission only — not on turns where you only \
 explore or compute. If the judge says your answer is incorrect, you receive feedback on the REPL result and may \
 revise and submit again until you are correct or you reach the maximum number of incorrect submissions."""
@@ -273,7 +269,7 @@ def _append_to_last_tool_message(messages: vf.Messages, extra: str) -> vf.Messag
 
 
 class LongBenchProRLMEnv(RLMEnv):
-    """RLM harness with LLM judge gated on REPL submit (``final_answer``), using ``JudgeRubric``."""
+    """LLM judge gated on REPL submit (``final_answer``), using ``JudgeRubric``."""
 
     def __init__(
         self,
@@ -349,7 +345,7 @@ def load_environment(
     judge_feedback_mode: JudgeFeedbackMode = "freeform",
     iterative_judge: bool = True,
     max_judge_submissions: int = 8,
-    # RLM options
+    # REPL / harness options
     max_turns: int = 30,
     sub_llm_max_turns: int = 5,
     sub_model: str | None = None,
@@ -370,7 +366,7 @@ def load_environment(
     **kwargs: Any,
 ) -> vf.Environment:
     """
-    Load the LongBench-Pro long-context RLM evaluation environment.
+    Load LongBench-Pro with a sandbox code REPL (``verifiers`` recursive harness).
 
     Args:
         split: Dataset split to use (LongBench-Pro only has "test").
@@ -384,21 +380,18 @@ def load_environment(
         difficulty: Filter by difficulty level ("Easy", "Moderate", "Hard", "Extreme", or "all").
         primary_task: Filter by primary task (e.g., "T1. Retrieval & Ranking").
         secondary_task: Filter by secondary task (e.g., "T3.2 Single-Hop Fact QA").
-        dataset_start_index: Skip the first N rows after filters and transform (same as ``longbenchpro`` and \
-            ``mini_swe_agent_plus`` / ``mini_swe_agent_plus_rlm``). Pair chat vs RLM with the same value and \
-            ``shuffle: false``.
+        dataset_start_index: Skip the first N rows after filters and transform.
         judge_model: Judge model id on Prime Inference (e.g. ``openai/gpt-4.1-mini`` or ``z-ai/glm-4.7``).
         judge_api_key_var: Environment variable for the judge API key (default ``PRIME_API_KEY``).
         judge_base_url: API base URL for the judge; if None, uses Prime Inference \
             ``https://api.pinference.ai/api/v1`` (OpenAI-compatible).
         judge_sampling_args: Optional sampling args forwarded to ``JudgeRubric`` / chat completions.
         judge_feedback_mode: ``freeform``, ``total_score`` (criterion lines + ``TOTAL: x/4``), or \
-            ``single_criterion`` (one ``VIOLATED: …`` line + one sentence); defined in ``longbenchpro_rlm_prompts``.
+            ``single_criterion`` (one ``VIOLATED: …`` line + one sentence); templates in ``longbenchpro_rlm_prompts``.
         iterative_judge: If True, run the LLM judge when the model submits from the REPL; wrong \
             submissions get feedback on the tool result and may resubmit (see ``max_judge_submissions``). \
             If False, judging runs only via rubric rewards at rollout end.
-        max_judge_submissions: Max incorrect graded submissions before the rollout stops accepting revisions. \
-            For parity with chat iterative refinement, align with ``max_turns`` in ``longbenchpro``.
+        max_judge_submissions: Max incorrect graded submissions before the rollout stops accepting revisions.
         max_turns: Maximum REPL iterations.
         sub_llm_max_turns: Max tool-calling turns for each sub-LLM call.
         sub_model: Model for sub-LLM calls (defaults to same as root model).
@@ -408,17 +401,17 @@ def load_environment(
         abort_on_code_timeout: If True, abort rollout on code timeout; if False, return error.
         max_startup_wait_seconds: Max seconds to wait for sandbox worker startup.
         pip_install_packages: Packages to install in sandbox.
-        repl_language: The RLM execution language ("bash" or "python").
+        repl_language: REPL language ("bash" or "python").
         sandbox_docker_image: Docker image for sandbox.
         sandbox_cpu_cores: CPU cores for sandbox.
         sandbox_memory_gb: Memory in GB for sandbox.
         sandbox_disk_size_gb: Disk size in GB for sandbox.
         sandbox_gpu_count: Number of GPUs for sandbox.
         sandbox_timeout_minutes: Overall sandbox lifetime in minutes.
-        **kwargs: Additional arguments passed to RLMEnv.
+        **kwargs: Additional arguments passed through to the harness base class.
 
     Returns:
-        Configured RLMEnv instance
+        Configured environment instance
     """
     # Choose question column based on thinking mode
     question_column = "question_thinking" if thinking else "question_nonthinking"
@@ -435,7 +428,7 @@ def load_environment(
         if include_env_tips:
             prompt_content = prompt_content + _ENV_TIPS
         if iterative_judge:
-            prompt_content = prompt_content + RLM_JUDGE_INSTRUCTION_SUFFIX
+            prompt_content = prompt_content + REPL_SUBMIT_JUDGE_SUFFIX
 
         if prompt_in_context_file:
             context = {"query": prompt_content, "context": context}

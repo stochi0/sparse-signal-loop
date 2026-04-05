@@ -1,10 +1,4 @@
-"""LLM judge prompts for mini-swe-agent-plus-rlm (RLM / REPL submit).
-
-Align wording with ``mini_swe_judge_prompts`` in the non-RLM package when changing behavior.
-
-This module only embeds the **REPL submit** submission line. Chat / echo-submit wording lives in
-``mini_swe_agent_plus/.../mini_swe_judge_prompts.py``.
-"""
+"""LLM judge prompts for the mini-swe-agent-plus-rlm environment."""
 
 from __future__ import annotations
 
@@ -12,12 +6,12 @@ from typing import Literal
 
 JudgeFeedbackMode = Literal["freeform", "total_score", "single_criterion"]
 
-RLM_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX = """\n\n**Iterative judge:** Setting ``answer[\"ready\"] = True`` (or ``RLM_READY=1`` in bash) \
+REPL_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX = """\n\n**Iterative judge:** Setting ``answer[\"ready\"] = True`` (or ``RLM_READY=1`` in bash) \
 submits your current ``answer[\"content\"]`` plus ``git diff`` to an LLM judge. If the judge says NO, the REPL output \
 includes a ``--- Judge ---`` block with feedback — revise in the REPL (edits, tests), then set ``ready`` again. Repeat \
 until YES or you exhaust wrong submissions. Budget root turns so you can still recover after at least one rejection."""
 
-_RLM_SUBMISSION_LINE = "Agent submission (declared final answer plus repository diff):"
+_REPL_DECLARED_ANSWER_SUBMISSION_LINE = "Agent submission (declared final answer plus repository diff):"
 
 _NO_FEEDBACK_RULES = """Strict rules for feedback after NO (all modes):
 - Do NOT quote, paste, paraphrase, or walk through specific code lines from the reference patch, or disclose exact \
@@ -40,7 +34,7 @@ Reference for grading (gold patch when available, plus problem context — do NO
 {{answer}}
 ```
 
-{_RLM_SUBMISSION_LINE}
+{_REPL_DECLARED_ANSWER_SUBMISSION_LINE}
 ```
 {{response}}
 ```

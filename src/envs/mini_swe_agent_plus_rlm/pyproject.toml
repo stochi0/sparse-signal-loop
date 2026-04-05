@@ -1,7 +1,7 @@
 [project]
 name = "mini-swe-agent-plus-rlm"
-description = "Mini SWE Agent Plus RLM environment for solving SWE issues inside Prime Sandboxes."
-tags = ["swe", "multi-turn", "sandbox", "rlm"]
+description = "Mini SWE Agent Plus with a sandbox code REPL for SWE tasks in Prime Sandboxes."
+tags = ["swe", "multi-turn", "sandbox", "repl"]
 version = "0.1.6"
 requires-python = ">=3.11"
 dependencies = [
