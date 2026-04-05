@@ -38,7 +38,7 @@ from verifiers.rubrics.judge_rubric import JudgeRubric
 from verifiers.types import ClientConfig, ToolMessage
 
 from .mini_swe_judge_prompts import (
-    ITERATIVE_JUDGE_INSTRUCTION_SUFFIX,
+    IN_LOOP_JUDGE_INSTRUCTION_SUFFIX,
     JudgeFeedbackMode,
     swe_judge_prompt_for_mode,
 )
@@ -113,11 +113,11 @@ def _judge_reference_from_row(x: dict[str, Any]) -> str:
     )
 
 
-def _process_example(x: dict[str, Any], *, iterative_suffix: str = ""):
+def _process_example(x: dict[str, Any], *, in_loop_suffix: str = ""):
     """Process dataset example into rollout input format. Module-level for stable caching."""
     body = PROMPT_TEMPLATE.format(problem_statement=x["problem_statement"])
-    if iterative_suffix:
-        body += iterative_suffix
+    if in_loop_suffix:
+        body += in_loop_suffix
     return {
         "question": body,
         "info": {**x},
@@ -1020,19 +1020,19 @@ class DeepSweSandboxEnv(vf.SandboxEnv):
         return False
 
 
-class DeepSweSandboxJudgeEnv(DeepSweSandboxEnv):
-    """Sandbox SWE env with optional LLM judge gated on ``MINI_SWE_AGENT_FINAL_OUTPUT``."""
+class DeepSweSandboxInLoopJudgeEnv(DeepSweSandboxEnv):
+    """Sandbox SWE env with in-loop LLM judge on ``MINI_SWE_AGENT_FINAL_OUTPUT`` submit."""
 
     def __init__(
         self,
         *,
         judge_rubric: JudgeRubric,
-        iterative_judge: bool,
+        in_loop_judge: bool,
         max_judge_submissions: int,
         **kwargs: Any,
     ) -> None:
         self._msap_judge_rubric = judge_rubric
-        self._msap_iterative_judge = iterative_judge
+        self._msap_in_loop_judge = in_loop_judge
         self._msap_max_judge_submissions = max_judge_submissions
         super().__init__(**kwargs)
 
@@ -1074,7 +1074,7 @@ class DeepSweSandboxJudgeEnv(DeepSweSandboxEnv):
 
     async def env_response(self, messages: vf.Messages, state: vf.State, **kwargs) -> vf.Messages:
         env_messages = await super().env_response(messages, state, **kwargs)
-        if not self._msap_iterative_judge or not self._submission_triggered(env_messages):
+        if not self._msap_in_loop_judge or not self._submission_triggered(env_messages):
             return env_messages
 
         assistant_txt = _assistant_text_from_message(messages[-1] if messages else None)
@@ -1205,7 +1205,7 @@ def load_environment(
     dataset_start_index: int = 0,
     skip_swebench_install: bool = True,
     logger: Any = None,
-    iterative_judge: bool = False,
+    in_loop_judge: bool = False,
     max_judge_submissions: int = 8,
     judge_model: str = _DEFAULT_PRIME_JUDGE_MODEL,
     judge_api_key_var: str = "PRIME_API_KEY",
@@ -1214,11 +1214,11 @@ def load_environment(
     judge_feedback_mode: JudgeFeedbackMode = "total_score",
 ) -> vf.Environment:
     split = "test" if "bench" in dataset_name.lower() else "train"
-    iterative_suffix = ITERATIVE_JUDGE_INSTRUCTION_SUFFIX if iterative_judge else ""
+    in_loop_suffix = IN_LOOP_JUDGE_INSTRUCTION_SUFFIX if in_loop_judge else ""
 
-    if iterative_judge and max_turns < 50:
+    if in_loop_judge and max_turns < 50:
         logging.getLogger(__name__).warning(
-            "iterative_judge=True but max_turns=%d is low; use more headroom (e.g. 80–200) so the agent can submit, "
+            "in_loop_judge=True but max_turns=%d is low; use more headroom (e.g. 80–200) so the agent can submit, "
             "read judge feedback, and revise before max_turns.",
             max_turns,
         )
@@ -1232,7 +1232,7 @@ def load_environment(
 
         ds = ds.map(
             _process_example,
-            fn_kwargs={"iterative_suffix": iterative_suffix},
+            fn_kwargs={"in_loop_suffix": in_loop_suffix},
             remove_columns=ds.column_names,
         )
         if dataset_start_index > 0:
@@ -1250,7 +1250,7 @@ def load_environment(
         harness=harness,
     )
 
-    if iterative_judge:
+    if in_loop_judge:
         judge_client_config = ClientConfig(
             client_type="openai_chat_completions",
             api_key_var=judge_api_key_var,
@@ -1293,7 +1293,7 @@ def load_environment(
 
         judge_rubric.add_reward_func(judge_reward, weight=0.0)
         rubric = judge_rubric
-        env_cls = DeepSweSandboxJudgeEnv
+        env_cls = DeepSweSandboxInLoopJudgeEnv
     else:
         rubric = deep_rubric
         env_cls = DeepSweSandboxEnv
@@ -1319,9 +1319,9 @@ def load_environment(
         skip_swebench_install=skip_swebench_install,
         logger=logger,
     )
-    if iterative_judge:
+    if in_loop_judge:
         env_kwargs["judge_rubric"] = judge_rubric
-        env_kwargs["iterative_judge"] = True
+        env_kwargs["in_loop_judge"] = True
         env_kwargs["max_judge_submissions"] = max_judge_submissions
 
     return env_cls(**env_kwargs)

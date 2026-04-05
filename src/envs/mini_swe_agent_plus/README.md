@@ -30,7 +30,7 @@ Supported harnesses and datasets:
 - **Rubric overview**: Reward based on executing repo test-suite
 
 ### Iterative LLM judge
-Set `iterative_judge` to **true** to enable an LLM judge when the agent issues the submission command (`echo MINI_SWE_AGENT_FINAL_OUTPUT`). The judge sees the latest assistant text plus a `git diff` from `/testbed` and the gold `patch` from the dataset when available. If the judge responds **NO**, feedback is appended to the tool output (look for `--- Judge`), `agent_signaled_done` is cleared so the agent can keep editing and **submit again**, up to `max_judge_submissions` incorrect attempts. Use a **generous `max_turns`** (e.g. 80–200): a low cap often prevents any submit before the rollout ends, so you never see judge feedback or recovery. A warning is logged if `iterative_judge` is on and `max_turns` is under 50. **Primary reward remains the test harness** (`solved`, weight 1.0); `judge_reward` (weight 0.0) reflects last judged submission. Default `iterative_judge` is **false** (no judge API).
+Set `in_loop_judge` to **true** to enable an LLM judge when the agent issues the submission command (`echo MINI_SWE_AGENT_FINAL_OUTPUT`). The judge sees the latest assistant text plus a `git diff` from `/testbed` and the gold `patch` from the dataset when available. If the judge responds **NO**, feedback is appended to the tool output (look for `--- Judge`), `agent_signaled_done` is cleared so the agent can keep editing and **submit again**, up to `max_judge_submissions` incorrect attempts. Use a **generous `max_turns`** (e.g. 80–200): a low cap often prevents any submit before the rollout ends, so you never see judge feedback or recovery. A warning is logged if `in_loop_judge` is on and `max_turns` is under 50. **Primary reward remains the test harness** (`solved`, weight 1.0); `judge_reward` (weight 0.0) reflects last judged submission. Default `in_loop_judge` is **false** (no judge API).
 
 ### Quickstart
 Run an evaluation with default settings:
@@ -72,13 +72,13 @@ Notes:
 | `allow_git` | bool | `false` | Allow git commands in execute_bash tool |
 | `filter_repos` | list[str] | `None` | Exclude these repos from dataset, e.g. `scikit-learn/scikit-learn` |
 | `skip_swebench_install` | bool | `true` | Skip SWE-bench eval install step for pure-Python changes |
-| `iterative_judge` | bool | `false` | LLM judge on each submission command when true (requires judge API) |
+| `in_loop_judge` | bool | `false` | LLM judge on each submission command when true (requires judge API) |
 | `max_judge_submissions` | int | `8` | Max incorrect submissions before the rollout is forced to end |
 | `judge_model` | str | `openai/gpt-4.1-mini` | Judge model id (Prime Inference–style) |
 | `judge_api_key_var` | str | `PRIME_API_KEY` | Env var for judge API key |
 | `judge_base_url` | str | `null` | OpenAI-compatible base URL (default Prime Inference) |
 | `judge_sampling_args` | dict | `null` | Optional sampling args for the judge chat call |
-| `judge_feedback_mode` | str | `total_score` | When `iterative_judge` is true: `total_score` (four 0/1 criteria + `TOTAL: x/4`) or `single_criterion` (one `VIOLATED:` line + one sentence). Criteria: `PROBLEM_FIT`, `PATCH_QUALITY`, `SCOPE`, `VERIFICATION`. |
+| `judge_feedback_mode` | str | `total_score` | When `in_loop_judge` is true: `total_score` (four 0/1 criteria + `TOTAL: x/4`) or `single_criterion` (one `VIOLATED:` line + one sentence). Criteria: `PROBLEM_FIT`, `PATCH_QUALITY`, `SCOPE`, `VERIFICATION`. |
 
 
 ### Metrics

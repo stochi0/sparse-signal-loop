@@ -6,7 +6,7 @@ from typing import Literal
 
 JudgeFeedbackMode = Literal["total_score", "single_criterion"]
 
-ITERATIVE_JUDGE_INSTRUCTION_SUFFIX = """\n\n**Iterative judge:** When you submit with ``echo MINI_SWE_AGENT_FINAL_OUTPUT``, an LLM judge \
+IN_LOOP_JUDGE_INSTRUCTION_SUFFIX = """\n\n**In-loop judge:** When you submit with ``echo MINI_SWE_AGENT_FINAL_OUTPUT``, an LLM judge \
 reviews your ``git diff`` (and any assistant text) against the task. If the first line of the judge response is NO, \
 the tool output will include a ``--- Judge ---`` section with concise feedback — treat that as your guide, fix the \
 code, and **submit again** with the same echo command. You can repeat until the judge accepts YES or you hit the \
