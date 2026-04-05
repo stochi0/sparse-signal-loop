@@ -20,6 +20,7 @@ def _build_parser() -> argparse.ArgumentParser:
         description=(
             "Phase 0 (mini SWE): 2×2 — (total_score vs single_criterion) × "
             "(mini-swe-agent-plus vs mini-swe-agent-plus-rlm). "
+            "Writes summary.json and REPORT.md under the run directory. "
             "Uses repo path deps after `uv sync`."
         ),
     )
