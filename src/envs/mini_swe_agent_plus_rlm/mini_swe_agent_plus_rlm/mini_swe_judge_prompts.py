@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-JudgeFeedbackMode = Literal["freeform", "total_score", "single_criterion"]
+JudgeFeedbackMode = Literal["total_score", "single_criterion"]
 
 REPL_ITERATIVE_JUDGE_INSTRUCTION_SUFFIX = """\n\n**Iterative judge:** Setting ``answer[\"ready\"] = True`` (or ``RLM_READY=1`` in bash) \
 submits your current ``answer[\"content\"]`` plus ``git diff`` to an LLM judge. If the judge says NO, the REPL output \
@@ -43,12 +43,6 @@ Reply with exactly one word on the first line: YES if the diff and summary plaus
 consistent with the reference when a patch is shown; otherwise NO."""
 
 
-_FREEFORM_BLOCK = f"""If the first line is NO, add one or more following lines with concise, actionable feedback \
-(what to re-check, files, tests to run) without revealing specific solution code from the reference patch or exact \
-line-by-line fixes.
-
-{_NO_FEEDBACK_RULES}"""
-
 _TOTAL_SCORE_BLOCK = f"""If the first line is NO, you must add the following lines after it (dense feedback):
 1. Four lines, one per criterion, each exactly in this form (score must be 0 or 1 only):
    PROBLEM_FIT: <0 or 1> — <one short note; no reference-patch leakage>
@@ -76,9 +70,7 @@ Do not mention other criteria, scores, or issues. Do not use bullet lists.
 def swe_judge_prompt_for_mode(mode: JudgeFeedbackMode) -> str:
     """Full judge template with ``{question}``, ``{answer}``, ``{response}`` placeholders."""
     intro = _swe_intro()
-    if mode == "freeform":
-        suffix = _FREEFORM_BLOCK
-    elif mode == "total_score":
+    if mode == "total_score":
         suffix = _TOTAL_SCORE_BLOCK
     elif mode == "single_criterion":
         suffix = _SINGLE_CRITERION_BLOCK
@@ -87,4 +79,4 @@ def swe_judge_prompt_for_mode(mode: JudgeFeedbackMode) -> str:
     return intro + "\n\n" + suffix
 
 
-SWE_SUBMISSION_JUDGE_PROMPT = swe_judge_prompt_for_mode("freeform")
+SWE_SUBMISSION_JUDGE_PROMPT = swe_judge_prompt_for_mode("total_score")

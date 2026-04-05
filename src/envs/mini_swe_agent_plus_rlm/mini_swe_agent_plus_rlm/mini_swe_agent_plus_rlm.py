@@ -1257,7 +1257,7 @@ def load_environment(
     judge_api_key_var: str = "PRIME_API_KEY",
     judge_base_url: str | None = None,
     judge_sampling_args: dict[str, Any] | None = None,
-    judge_feedback_mode: JudgeFeedbackMode = "freeform",
+    judge_feedback_mode: JudgeFeedbackMode = "total_score",
     **kwargs,
 ) -> vf.Environment:
     """Load the mini-swe-agent-plus-rlm environment.
@@ -1319,7 +1319,7 @@ def load_environment(
         judge_api_key_var: Environment variable holding the judge API key.
         judge_base_url: Judge API base URL; default Prime Inference.
         judge_sampling_args: Optional extra args for judge ``chat.completions.create``.
-        judge_feedback_mode: ``freeform`` (default), ``total_score`` (four 0/1 criteria + ``TOTAL: x/4``), or \
+        judge_feedback_mode: ``total_score`` (default; four 0/1 criteria + ``TOTAL: x/4``) or \
             ``single_criterion`` (one ``VIOLATED: …`` line + one sentence); only used when ``iterative_judge`` is True.
         logger: Optional logger instance.
     """

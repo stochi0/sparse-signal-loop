@@ -288,7 +288,7 @@ def load_environment(
     judge_api_key_var: str = "PRIME_API_KEY",
     judge_base_url: str | None = None,
     judge_sampling_args: dict[str, Any] | None = None,
-    judge_feedback_mode: JudgeFeedbackMode = "freeform",
+    judge_feedback_mode: JudgeFeedbackMode = "total_score",
     iterative_judge: bool = True,
     max_turns: int = 8,
     **kwargs: Any,
@@ -317,9 +317,9 @@ def load_environment(
         judge_api_key_var: Env var for the judge API key.
         judge_base_url: API base URL; default Prime Inference.
         judge_sampling_args: Optional sampling args for the judge.
-        judge_feedback_mode: ``freeform`` (default): concise multi-line feedback after NO; ``total_score``: \
-            four 0/1 criterion lines plus ``TOTAL: x/4``; ``single_criterion``: one ``VIOLATED: …`` line plus \
-            one feedback sentence (sparse signal). Templates live in ``longbenchpro_prompts``.
+        judge_feedback_mode: ``total_score`` (default): four 0/1 criterion lines plus ``TOTAL: x/4``; \
+            ``single_criterion``: one ``VIOLATED: …`` line plus one feedback sentence (sparse signal). \
+            Templates live in ``longbenchpro_prompts``.
         iterative_judge: If True, judge after each assistant message (``max_turns`` cap). \
             If False, single-turn rollout; judge only via rubric at the end.
         max_turns: Max assistant messages when ``iterative_judge`` is True.

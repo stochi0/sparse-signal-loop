@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-JudgeFeedbackMode = Literal["freeform", "total_score", "single_criterion"]
+JudgeFeedbackMode = Literal["total_score", "single_criterion"]
 
 _LBP_INTRO = """Given a ground truth answer and a model response, decide if the response is correct \
 with respect to the question and the reference answer (allowing paraphrase and equivalent formatting when appropriate).
@@ -35,11 +35,6 @@ comes from the reference).
 ([Answer] / [答案], line order, missing items), or where in the long context to look again (section names, chronology), \
 without disclosing what the passage says the answer is."""
 
-_FREEFORM_BLOCK = f"""If the first line is NO, add one or more following lines with concise, actionable feedback. \
-Feedback is shown to the model so it can revise: it must NOT reveal or teach the correct answer.
-
-{_NO_FEEDBACK_RULES}"""
-
 _TOTAL_SCORE_BLOCK = f"""If the first line is NO, you must add the following lines after it (dense feedback):
 1. Four lines, one per criterion, each exactly in this form (score must be 0 or 1 only):
    FORMAT: <0 or 1> — <one short note; no ground-truth leakage>
@@ -63,9 +58,7 @@ Do not mention other criteria, scores, or issues. Do not use bullet lists.
 
 def lbp_judge_prompt_for_mode(mode: JudgeFeedbackMode) -> str:
     """Return the full judge template (with ``{question}``, ``{answer}``, ``{response}`` placeholders)."""
-    if mode == "freeform":
-        suffix = _FREEFORM_BLOCK
-    elif mode == "total_score":
+    if mode == "total_score":
         suffix = _TOTAL_SCORE_BLOCK
     elif mode == "single_criterion":
         suffix = _SINGLE_CRITERION_BLOCK
@@ -74,5 +67,4 @@ def lbp_judge_prompt_for_mode(mode: JudgeFeedbackMode) -> str:
     return _LBP_INTRO + "\n\n" + suffix
 
 
-# Default prompt (backward compatible with pre-mode implementations).
-LBP_JUDGE_PROMPT = lbp_judge_prompt_for_mode("freeform")
+LBP_JUDGE_PROMPT = lbp_judge_prompt_for_mode("total_score")

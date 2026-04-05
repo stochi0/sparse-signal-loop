@@ -12,8 +12,7 @@ Summarization tasks (T4.x) are excluded.
 
 `judge_feedback_mode` controls how the judge formats feedback after `NO`:
 
-- `freeform` (default): unstructured multi-line feedback.
-- `total_score`: four 0/1 criterion lines plus `TOTAL: x/4`.
+- `total_score` (default): four 0/1 criterion lines plus `TOTAL: x/4`.
 - `single_criterion`: one `VIOLATED:` line plus one sentence.
 
 For iterative judging, set `iterative_judge: true` and tune `max_turns` for enough room to revise after feedback.
@@ -61,7 +60,7 @@ uv run vf-eval longbenchpro -m gpt-5-mini -n 3 -a '{"prompt_in_context_file": tr
 | `judge_api_key_var` | str | `"PRIME_API_KEY"` | API key env var |
 | `judge_base_url` | str \| None | `None` | Default: Prime Inference |
 | `judge_sampling_args` | dict \| None | `None` | Judge sampling kwargs |
-| `judge_feedback_mode` | str | `"freeform"` | `freeform`, `total_score`, or `single_criterion` |
+| `judge_feedback_mode` | str | `"total_score"` | `total_score` or `single_criterion` |
 | `iterative_judge` | bool | `True` | Multi-turn feedback vs single-turn |
 | `max_turns` | int | `8` | Max assistant messages when `iterative_judge` is true |
 
@@ -75,5 +74,5 @@ Primary reward is `judge_reward` (weight 1.0); `task_metric_reward` and `contain
 - 0.1.4: `dataset_start_index`.
 - 0.1.3: `lbp_id` to pin one dataset row.
 - 0.1.2: Prompt module scoped to this package (`longbenchpro_prompts.py`).
-- 0.1.1: `judge_feedback_mode` (`freeform` / `total_score` / `single_criterion`).
+- 0.1.1: `judge_feedback_mode` (`total_score` / `single_criterion`).
 - 0.1.0: Initial release.

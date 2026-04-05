@@ -342,7 +342,7 @@ def load_environment(
     judge_api_key_var: str = "PRIME_API_KEY",
     judge_base_url: str | None = None,
     judge_sampling_args: dict[str, Any] | None = None,
-    judge_feedback_mode: JudgeFeedbackMode = "freeform",
+    judge_feedback_mode: JudgeFeedbackMode = "total_score",
     iterative_judge: bool = True,
     max_judge_submissions: int = 8,
     # REPL / harness options
@@ -386,7 +386,7 @@ def load_environment(
         judge_base_url: API base URL for the judge; if None, uses Prime Inference \
             ``https://api.pinference.ai/api/v1`` (OpenAI-compatible).
         judge_sampling_args: Optional sampling args forwarded to ``JudgeRubric`` / chat completions.
-        judge_feedback_mode: ``freeform``, ``total_score`` (criterion lines + ``TOTAL: x/4``), or \
+        judge_feedback_mode: ``total_score`` (default; criterion lines + ``TOTAL: x/4``) or \
             ``single_criterion`` (one ``VIOLATED: …`` line + one sentence); templates in ``longbenchpro_rlm_prompts``.
         iterative_judge: If True, run the LLM judge when the model submits from the REPL; wrong \
             submissions get feedback on the tool result and may resubmit (see ``max_judge_submissions``). \

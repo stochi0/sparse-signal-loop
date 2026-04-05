@@ -1214,7 +1214,7 @@ def load_environment(
     judge_api_key_var: str = "PRIME_API_KEY",
     judge_base_url: str | None = None,
     judge_sampling_args: dict[str, Any] | None = None,
-    judge_feedback_mode: JudgeFeedbackMode = "freeform",
+    judge_feedback_mode: JudgeFeedbackMode = "total_score",
 ) -> vf.Environment:
     split = "test" if "bench" in dataset_name.lower() else "train"
     iterative_suffix = ITERATIVE_JUDGE_INSTRUCTION_SUFFIX if iterative_judge else ""

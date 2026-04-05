@@ -93,7 +93,7 @@ Notes:
 | `judge_api_key_var` | str | `PRIME_API_KEY` | Env var for judge API key |
 | `judge_base_url` | str | `None` | OpenAI-compatible base URL (default Prime Inference) |
 | `judge_sampling_args` | dict | `None` | Optional sampling args for the judge chat call |
-| `judge_feedback_mode` | str | `freeform` | When `iterative_judge` is true: `freeform`, `total_score`, or `single_criterion` (criteria `PROBLEM_FIT`, `PATCH_QUALITY`, `SCOPE`, `VERIFICATION`). |
+| `judge_feedback_mode` | str | `total_score` | When `iterative_judge` is true: `total_score` or `single_criterion` (criteria `PROBLEM_FIT`, `PATCH_QUALITY`, `SCOPE`, `VERIFICATION`). |
 
 #### Timeout design
 

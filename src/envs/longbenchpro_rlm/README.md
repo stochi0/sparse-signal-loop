@@ -66,7 +66,7 @@ uv run vf-eval longbenchpro-rlm -m gpt-5-mini -n 5 -a '{"secondary_task": "T3.2 
 | `judge_api_key_var` | str | `"PRIME_API_KEY"` | Env var for judge API key (Prime Inference) |
 | `judge_base_url` | str \| None | `None` | Judge API base URL; if `None`, uses Prime Inference `https://api.pinference.ai/api/v1` |
 | `judge_sampling_args` | dict \| None | `None` | Optional sampling args forwarded to the judge chat call |
-| `judge_feedback_mode` | str | `"freeform"` | `freeform`, `total_score`, or `single_criterion` (see `longbenchpro_rlm_prompts.py`) |
+| `judge_feedback_mode` | str | `"total_score"` | `total_score` or `single_criterion` (see `longbenchpro_rlm_prompts.py`) |
 | `iterative_judge` | bool | `True` | If True, LLM judge runs only on REPL submit; wrong answers get feedback and may resubmit |
 | `max_judge_submissions` | int | `8` | Max incorrect graded submissions before the rollout stops accepting new answers |
 | `max_turns` | int | `30` | Maximum REPL iterations |
