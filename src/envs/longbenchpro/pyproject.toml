@@ -1,0 +1,24 @@
+[project]
+name = "longbenchpro"
+description = "LongBench-Pro long-context benchmark in standard chat (non-RLM), with optional iterative LLM judge"
+tags = ["long-context", "multi-turn", "benchmark", "judge"]
+version = "0.1.5"
+requires-python = ">=3.11"
+dependencies = [
+    "datasets",
+    "pytrec-eval-terrier",
+    "verifiers>=0.1.12.dev1",
+]
+
+[tool.uv]
+prerelease = "allow"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["longbenchpro.py", "longbenchpro_prompts.py", "pyproject.toml", "README.md"]
+
+[tool.hatch.metadata]
+allow-direct-references = true

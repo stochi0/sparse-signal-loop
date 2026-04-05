@@ -1,0 +1,21 @@
+[project]
+name = "sparse-signal-loop"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "datasets",
+    "httpx",
+    "jinja2",
+    "numpy",
+    "prime-sandboxes>=0.2.13",
+    "pytrec-eval-terrier",
+    "requests",
+    "swebench==4.1.0",
+    "tenacity",
+    "verifiers>=0.1.12.dev1",
+]
+
+[tool.uv]
+prerelease = "allow"

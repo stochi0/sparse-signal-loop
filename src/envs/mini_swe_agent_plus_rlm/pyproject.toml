@@ -1,0 +1,34 @@
+[project]
+name = "mini-swe-agent-plus-rlm"
+description = "Mini SWE Agent Plus RLM environment for solving SWE issues inside Prime Sandboxes."
+tags = ["swe", "multi-turn", "sandbox", "rlm"]
+version = "0.1.6"
+requires-python = ">=3.11"
+dependencies = [
+    "datasets",
+    "httpx",
+    "jinja2",
+    "numpy",
+    "prime-sandboxes>=0.2.13",
+    "requests",
+    "swebench==4.1.0",
+    "tenacity",
+    "verifiers>=0.1.12.dev1",
+]
+
+[tool.uv]
+prerelease = "allow"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build]
+include = ["mini_swe_agent_plus_rlm", "tools"]
+
+[tool.verifiers.eval]
+num_examples = 5
+rollouts_per_example = 3
