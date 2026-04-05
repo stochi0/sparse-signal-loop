@@ -67,7 +67,7 @@ uv run vf-eval longbenchpro-rlm -m gpt-5-mini -n 5 -a '{"secondary_task": "T3.2 
 | `judge_base_url` | str \| None | `None` | Judge API base URL; if `None`, uses Prime Inference `https://api.pinference.ai/api/v1` |
 | `judge_sampling_args` | dict \| None | `None` | Optional sampling args forwarded to the judge chat call |
 | `judge_feedback_mode` | str | `"total_score"` | `total_score` or `single_criterion` (see `longbenchpro_rlm_prompts.py`) |
-| `iterative_judge` | bool | `True` | If True, LLM judge runs only on REPL submit; wrong answers get feedback and may resubmit |
+| `in_loop_judge` | bool | `True` | If True, LLM judge runs during the rollout on REPL submit; wrong answers get feedback and may resubmit |
 | `max_judge_submissions` | int | `8` | Max incorrect graded submissions before the rollout stops accepting new answers |
 | `max_turns` | int | `30` | Maximum REPL iterations |
 | `sub_llm_max_turns` | int | `5` | Max tool-calling turns for each sub-LLM call |
@@ -119,4 +119,4 @@ LongBench-Pro covers 11 primary tasks with 25 secondary tasks. Summarization tas
 - 0.1.2: Dedicated `longbenchpro_rlm_prompts.py` in this package.
 - 0.1.1: `judge_feedback_mode` for dense vs sparse judge feedback.
 - 0.1.0: Initial release (excludes T4.x summarization tasks).
-- Judge client uses verifiers `resolve_client` / `ClientConfig` (`openai_chat_completions`). Submit-gated iterative judge uses `JudgeRubric.judge` in `LongBenchProRLMEnv`.
+- Judge client uses verifiers `resolve_client` / `ClientConfig` (`openai_chat_completions`). Submit-gated in-loop judge uses `JudgeRubric.judge` in `LongBenchProRLMEnv`.

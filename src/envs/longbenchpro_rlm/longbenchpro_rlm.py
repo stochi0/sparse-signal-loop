@@ -40,8 +40,8 @@ Strategy for long-context information retrieval:
 4. Aggregate the relevant findings from the responses
 </env_tips>"""
 
-# When iterative_judge is on, explain submit-gated judging for REPL workflows.
-REPL_SUBMIT_JUDGE_SUFFIX = """\n\nWhen you submit a final answer from the REPL (answer['ready'] = True in Python, \
+# When in_loop_judge is on, explain submit-gated judging for REPL workflows.
+IN_LOOP_JUDGE_REPL_INSTRUCTION_SUFFIX = """\n\nWhen you submit a final answer from the REPL (answer['ready'] = True in Python, \
 or ANSWER_READY=1 in bash), the environment runs the judge on that submission only — not on turns where you only \
 explore or compute. If the judge says your answer is incorrect, you receive feedback on the REPL result and may \
 revise and submit again until you are correct or you reach the maximum number of incorrect submissions."""
@@ -269,24 +269,24 @@ def _append_to_last_tool_message(messages: vf.Messages, extra: str) -> vf.Messag
 
 
 class LongBenchProRLMEnv(RLMEnv):
-    """LLM judge gated on REPL submit (``final_answer``), using ``JudgeRubric``."""
+    """In-loop LLM judge on REPL submit (``final_answer``), using ``JudgeRubric``."""
 
     def __init__(
         self,
         *,
         judge_rubric: JudgeRubric,
-        iterative_judge: bool,
+        in_loop_judge: bool,
         max_judge_submissions: int,
         **kwargs: Any,
     ):
         self._lbp_judge_rubric = judge_rubric
-        self._lbp_iterative_judge = iterative_judge
+        self._lbp_in_loop_judge = in_loop_judge
         self._lbp_max_judge_submissions = max_judge_submissions
         super().__init__(**kwargs)
 
     async def env_response(self, messages: vf.Messages, state: vf.State, **kwargs: Any) -> vf.Messages:
         tool_messages = await super().env_response(messages, state, **kwargs)
-        if not self._lbp_iterative_judge or "final_answer" not in state:
+        if not self._lbp_in_loop_judge or "final_answer" not in state:
             return tool_messages
 
         response = state.get("final_answer", "") or ""
@@ -343,7 +343,7 @@ def load_environment(
     judge_base_url: str | None = None,
     judge_sampling_args: dict[str, Any] | None = None,
     judge_feedback_mode: JudgeFeedbackMode = "total_score",
-    iterative_judge: bool = True,
+    in_loop_judge: bool = True,
     max_judge_submissions: int = 8,
     # REPL / harness options
     max_turns: int = 30,
@@ -388,9 +388,9 @@ def load_environment(
         judge_sampling_args: Optional sampling args forwarded to ``JudgeRubric`` / chat completions.
         judge_feedback_mode: ``total_score`` (default; criterion lines + ``TOTAL: x/4``) or \
             ``single_criterion`` (one ``VIOLATED: …`` line + one sentence); templates in ``longbenchpro_rlm_prompts``.
-        iterative_judge: If True, run the LLM judge when the model submits from the REPL; wrong \
+        in_loop_judge: If True, run the LLM judge **during** the rollout when the model submits from the REPL; wrong \
             submissions get feedback on the tool result and may resubmit (see ``max_judge_submissions``). \
-            If False, judging runs only via rubric rewards at rollout end.
+            If False, judging runs only via rubric rewards at trajectory end.
         max_judge_submissions: Max incorrect graded submissions before the rollout stops accepting revisions.
         max_turns: Maximum REPL iterations.
         sub_llm_max_turns: Max tool-calling turns for each sub-LLM call.
@@ -427,8 +427,8 @@ def load_environment(
         prompt_content = question
         if include_env_tips:
             prompt_content = prompt_content + _ENV_TIPS
-        if iterative_judge:
-            prompt_content = prompt_content + REPL_SUBMIT_JUDGE_SUFFIX
+        if in_loop_judge:
+            prompt_content = prompt_content + IN_LOOP_JUDGE_REPL_INSTRUCTION_SUFFIX
 
         if prompt_in_context_file:
             context = {"query": prompt_content, "context": context}
@@ -548,7 +548,7 @@ def load_environment(
         raise ValueError(f"sandbox_labels must be of type list[str]; you provided {sandbox_labels}")
     sandbox_labels = list(set(sandbox_labels))
 
-    env_cls = LongBenchProRLMEnv if iterative_judge else RLMEnv
+    env_cls = LongBenchProRLMEnv if in_loop_judge else RLMEnv
     env_kwargs: dict[str, Any] = dict(
         repl_language=repl_language,
         max_turns=max_turns,
@@ -572,9 +572,9 @@ def load_environment(
         sandbox_labels=sandbox_labels,
         **kwargs,
     )
-    if iterative_judge:
+    if in_loop_judge:
         env_kwargs["judge_rubric"] = judge_rubric
-        env_kwargs["iterative_judge"] = iterative_judge
+        env_kwargs["in_loop_judge"] = in_loop_judge
         env_kwargs["max_judge_submissions"] = max_judge_submissions
 
     return env_cls(**env_kwargs)
