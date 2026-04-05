@@ -422,6 +422,13 @@ def load_environment(
         judge_sampling_args=judge_sampling_args,
     )
 
+    def _parsed_answer_for_metrics(state: vf.State) -> str:
+        rubric_parser = judge_rubric.parser
+        comp = state.get("completion")
+        if comp:
+            return rubric_parser.parse_answer(comp) or ""
+        return state.get("final_answer", "") or ""
+
     async def judge_reward(state: vf.State, judge, **_kwargs: Any) -> float:
         answers = json.loads(state.get("answer", "[]"))
         ground_truth = "; ".join(answers)
@@ -436,23 +443,13 @@ def load_environment(
         return 1.0 if correct else 0.0
 
     def task_metric_reward(state: vf.State, **_kwargs: Any) -> float:
-        rubric_parser = judge_rubric.parser
-        comp = state.get("completion")
-        if comp:
-            response = rubric_parser.parse_answer(comp) or ""
-        else:
-            response = state.get("final_answer", "") or ""
+        response = _parsed_answer_for_metrics(state)
         answers = json.loads(state.get("answer", "[]"))
         sec_task = state["info"]["secondary_task"]
         return _compute_task_metric(sec_task, answers, response)
 
     def contains_answer_reward(state: vf.State, **_kwargs: Any) -> float:
-        rubric_parser = judge_rubric.parser
-        comp = state.get("completion")
-        if comp:
-            response = (rubric_parser.parse_answer(comp) or "").strip().lower()
-        else:
-            response = (state.get("final_answer", "") or "").strip().lower()
+        response = _parsed_answer_for_metrics(state).strip().lower()
         answers = json.loads(state.get("answer", "[]"))
         return 1.0 if any(a.strip().lower() in response for a in answers) else 0.0
 

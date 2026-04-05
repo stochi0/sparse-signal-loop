@@ -1,6 +1,9 @@
 """LLM judge prompts for mini-swe-agent-plus-rlm (RLM / REPL submit).
 
 Align wording with ``mini_swe_judge_prompts`` in the non-RLM package when changing behavior.
+
+This module only embeds the **REPL submit** submission line. Chat / echo-submit wording lives in
+``mini_swe_agent_plus/.../mini_swe_judge_prompts.py``.
 """
 
 from __future__ import annotations
@@ -14,12 +17,7 @@ submits your current ``answer[\"content\"]`` plus ``git diff`` to an LLM judge. 
 includes a ``--- Judge ---`` block with feedback — revise in the REPL (edits, tests), then set ``ready`` again. Repeat \
 until YES or you exhaust wrong submissions. Budget root turns so you can still recover after at least one rejection."""
 
-SubmissionVariant = Literal["chat", "rlm"]
-
-_SUBMISSION_LINE = {
-    "chat": "Agent submission (final assistant message text, if any, plus repository diff):",
-    "rlm": "Agent submission (declared final answer plus repository diff):",
-}
+_RLM_SUBMISSION_LINE = "Agent submission (declared final answer plus repository diff):"
 
 _NO_FEEDBACK_RULES = """Strict rules for feedback after NO (all modes):
 - Do NOT quote, paste, paraphrase, or walk through specific code lines from the reference patch, or disclose exact \
@@ -29,8 +27,7 @@ edits that are not already implied by the agent's diff.
 the solution."""
 
 
-def _swe_intro(variant: SubmissionVariant) -> str:
-    sub = _SUBMISSION_LINE[variant]
+def _swe_intro() -> str:
     return f"""You review a software-engineering rollout before hidden tests run.
 
 Problem / PR description (what the agent must fix or implement):
@@ -43,7 +40,7 @@ Reference for grading (gold patch when available, plus problem context — do NO
 {{answer}}
 ```
 
-{sub}
+{_RLM_SUBMISSION_LINE}
 ```
 {{response}}
 ```
@@ -82,9 +79,9 @@ Do not mention other criteria, scores, or issues. Do not use bullet lists.
 {_NO_FEEDBACK_RULES}"""
 
 
-def swe_judge_prompt_for_mode(mode: JudgeFeedbackMode, *, variant: SubmissionVariant = "rlm") -> str:
+def swe_judge_prompt_for_mode(mode: JudgeFeedbackMode) -> str:
     """Full judge template with ``{question}``, ``{answer}``, ``{response}`` placeholders."""
-    intro = _swe_intro(variant)
+    intro = _swe_intro()
     if mode == "freeform":
         suffix = _FREEFORM_BLOCK
     elif mode == "total_score":
@@ -96,4 +93,4 @@ def swe_judge_prompt_for_mode(mode: JudgeFeedbackMode, *, variant: SubmissionVar
     return intro + "\n\n" + suffix
 
 
-SWE_SUBMISSION_JUDGE_PROMPT = swe_judge_prompt_for_mode("freeform", variant="rlm")
+SWE_SUBMISSION_JUDGE_PROMPT = swe_judge_prompt_for_mode("freeform")

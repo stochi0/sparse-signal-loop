@@ -1400,7 +1400,7 @@ def load_environment(
             parser=vf.Parser(),
             judge_client=judge_async_client,
             judge_model=judge_model,
-            judge_prompt=swe_judge_prompt_for_mode(judge_feedback_mode, variant="rlm"),
+            judge_prompt=swe_judge_prompt_for_mode(judge_feedback_mode),
             judge_sampling_args=judge_sampling_args,
         )
         judge_rubric.add_reward_func(deep_rubric.solved, weight=1.0)
