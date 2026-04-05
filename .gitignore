@@ -219,3 +219,4 @@ __marimo__/
 .opencode/
 context/
 src/envs/*/outputs/
+outputs/
