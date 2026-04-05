@@ -125,12 +125,10 @@ def summarize_cell(
 
 
 def write_run_summary(run_dir: Path, spec_dict: dict[str, Any], rows: list[Phase0CellSummary]) -> Path:
+    """JSON-only summary; prefer ``experiments.run_artifacts.write_run_summary`` for REPORT.md."""
     run_dir.mkdir(parents=True, exist_ok=True)
     out = run_dir / "summary.json"
-    payload = {
-        "spec": spec_dict,
-        "cells": [r.to_json_dict() for r in rows],
-    }
+    payload = {"spec": spec_dict, "cells": [r.to_json_dict() for r in rows]}
     out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return out
 

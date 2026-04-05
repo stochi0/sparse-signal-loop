@@ -9,13 +9,14 @@ from typing import Any
 
 from verifiers.utils.eval_utils import quiet_datasets, run_evaluation
 
+from experiments.run_artifacts import write_run_summary
+
 from .env_args import env_id_for_cell
 from .eval_config import build_eval_config
 from .reporting import (
     Phase0CellSummary,
     print_comparison_table,
     summarize_cell,
-    write_run_summary,
 )
 from .schema import Phase0Cell, Phase0Spec
 
@@ -77,7 +78,8 @@ async def run_phase0_lbp(
             )
             logger.info("Finished cell %s avg_reward=%.4f", slug, rows[-1].avg_reward)
 
-    write_run_summary(base, _spec_for_json(spec), rows)
-    print(f"\nPhase 0 run directory: {base.resolve()}\n")
+    _, report_path = write_run_summary(base, _spec_for_json(spec), rows)
+    print(f"\nPhase 0 run directory: {base.resolve()}")
+    print(f"Markdown report: {report_path.resolve()}\n")
     print_comparison_table(rows)
     return rows
