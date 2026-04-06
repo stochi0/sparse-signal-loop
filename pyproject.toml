@@ -37,6 +37,8 @@ mini-swe-agent-plus-rlm = { path = "src/envs/mini_swe_agent_plus_rlm", editable 
 [project.scripts]
 ssl-phase0-lbp = "experiments.phase0_lbp.cli:main"
 ssl-phase0-msap = "experiments.phase0_mini_swe.cli:main"
+ssl-phase1-lbp = "experiments.phase1_lbp.cli:main"
+ssl-phase1-msap = "experiments.phase1_mini_swe.cli:main"
 ssl-experiment-report = "experiments.report_cli:main"
 
 [tool.uv]
