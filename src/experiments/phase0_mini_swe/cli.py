@@ -8,7 +8,7 @@ from pathlib import Path
 from verifiers import setup_logging
 from verifiers.utils.eval_utils import get_log_level
 
-from experiments.phase0_lbp.runner import parse_cell_filter
+from experiments.cell_utils import parse_cell_filter
 from experiments.phase0_lbp.schema import Phase0Cell
 from experiments.phase0_mini_swe.eval_config import build_eval_config
 from experiments.phase0_mini_swe.runner import run_mini_swe_phase0

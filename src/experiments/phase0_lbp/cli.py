@@ -8,8 +8,10 @@ from pathlib import Path
 from verifiers import setup_logging
 from verifiers.utils.eval_utils import get_log_level
 
+from experiments.cell_utils import parse_cell_filter
+
 from .eval_config import build_eval_config
-from .runner import parse_cell_filter, run_phase0_lbp
+from .runner import run_phase0_lbp
 from .schema import Phase0Cell, Phase0Spec
 
 

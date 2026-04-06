@@ -9,6 +9,7 @@ from typing import Any
 
 from verifiers.utils.eval_utils import quiet_datasets, run_evaluation
 
+from experiments.cell_utils import parse_cell_filter
 from experiments.run_artifacts import write_run_summary
 
 from .env_args import env_id_for_cell
@@ -30,17 +31,6 @@ def ensure_env_modules_loaded() -> None:
 
 def _spec_for_json(spec: Phase0Spec) -> dict[str, Any]:
     return asdict(spec)
-
-
-def parse_cell_filter(slugs: str | None, cells: list[Phase0Cell]) -> list[Phase0Cell]:
-    if not slugs:
-        return list(cells)
-    order = [s.strip() for s in slugs.split(",") if s.strip()]
-    by_slug = {c.slug(): c for c in cells}
-    missing = set(order) - set(by_slug.keys())
-    if missing:
-        raise ValueError(f"Unknown cell slug(s): {sorted(missing)}. Valid: {sorted(by_slug)}")
-    return [by_slug[s] for s in order]
 
 
 async def run_phase0_lbp(
