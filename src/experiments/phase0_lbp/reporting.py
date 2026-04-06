@@ -184,6 +184,7 @@ class Phase0CellSummary:
     median_tokens_success: float | None = None
     n_judge_success: int = 0
     success_at_k: dict[str, float] = field(default_factory=dict)
+    memory: str | None = None
 
     def to_json_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -196,6 +197,8 @@ def summarize_cell(
     feedback: str,
     env_id: str,
     outputs: GenerateOutputs,
+    *,
+    memory: str | None = None,
 ) -> Phase0CellSummary:
     meta: GenerateMetadata = outputs["metadata"]
     path = meta.get("path_to_save")
@@ -233,6 +236,7 @@ def summarize_cell(
         median_tokens_success=derived["median_tokens_success"],
         n_judge_success=int(derived["n_judge_success"]),
         success_at_k=dict(derived["success_at_k"]),
+        memory=memory,
     )
 
 
@@ -259,16 +263,18 @@ def _fmt_tokens_succ_median(r: Phase0CellSummary) -> str:
 
 
 def print_comparison_table(rows: list[Phase0CellSummary]) -> None:
-    """Stdout table for quick 2×2 inspection."""
+    """Stdout table for quick factorial inspection (optional ``memory`` column for Phase 1)."""
     ks = sorted({k for r in rows for k in r.success_at_k.keys()}, key=lambda s: int(s.lstrip("@")))
     k_headers = "".join(f"{k:>7}" for k in ks) if ks else ""
+    show_mem = any(r.memory for r in rows)
+    mem_h = f" {'mem':>8}" if show_mem else ""
     header = (
-        f"{'cell':<36} {'judge':>8} {'reward':>8} {'task_m':>8}{k_headers} "
+        f"{'cell':<36}{mem_h} {'judge':>8} {'reward':>8} {'task_m':>8}{k_headers} "
         f"{'tok_ok_mn':>10} {'tok_ok_md':>10} {'wall_s':>8} {'roll_s':>8} {'tok_tot':>10}"
     )
     print(header)
     print("-" * len(header))
-    for r in sorted(rows, key=lambda x: (x.harness, x.feedback)):
+    for r in sorted(rows, key=lambda x: (x.harness, x.feedback, x.memory or "")):
         jyr = r.judge_yes_rate
         judge_s = _fmt_rate(jyr)
         tm = r.avg_task_metric
@@ -282,7 +288,8 @@ def print_comparison_table(rows: list[Phase0CellSummary]) -> None:
         ttot = f"{r.total_tokens:.0f}" if r.total_tokens is not None else "n/a"
         tok_m = _fmt_tokens_succ_mean(r)
         tok_med = _fmt_tokens_succ_median(r)
+        mem_c = f" {r.memory or '—':>8}" if show_mem else ""
         print(
-            f"{r.slug:<36} {judge_s:>8} {r.avg_reward:8.4f} {task_s:>8}{s_k} "
+            f"{r.slug:<36}{mem_c} {judge_s:>8} {r.avg_reward:8.4f} {task_s:>8}{s_k} "
             f"{tok_m:>9} {tok_med:>10} {wall_s:8.1f} {roll_s_str:>8} {ttot:>10}"
         )
