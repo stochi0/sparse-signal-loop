@@ -1,4 +1,4 @@
-"""Persist run outputs shared by phase-0 experiments (LBP, mini SWE, …)."""
+"""Persist run outputs shared by phase-0 / phase-1 experiment CLIs (LBP, mini SWE, …)."""
 
 from __future__ import annotations
 

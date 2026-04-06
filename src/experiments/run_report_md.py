@@ -11,6 +11,8 @@ from typing import Any
 _EXPERIMENT_BENCHMARK: dict[str, str] = {
     "phase0_lbp": "LongBench-Pro (LBP)",
     "phase0_mini_swe": "Mini SWE Agent Plus (MSAP)",
+    "phase1_lbp": "LongBench-Pro · Phase 1 (working memory)",
+    "phase1_mini_swe": "Mini SWE Agent Plus · Phase 1 (working memory)",
 }
 
 
@@ -55,18 +57,28 @@ def render_cells_table(cells: list[dict[str, Any]]) -> str:
     k_cols = _success_k_columns(cells)
     k_header = "".join(f" | {k}" for k in k_cols)
     k_sep = "".join(" | ---:" for _ in k_cols)
+    show_mem = any(c.get("memory") for c in cells)
+    mem_h = " | Memory" if show_mem else ""
+    mem_sep = " | ---" if show_mem else ""
     header = (
-        "| Cell | Env | Judge YES | Reward | Err | Task metric"
+        "| Cell | Env"
+        + mem_h
+        + " | Judge YES | Reward | Err | Task metric"
         + k_header
         + " | Mean tok (success) | Median tok (success) | n succ | n | Wall (s) | Roll (s) | Tokens |"
     )
     sep = (
-        "| --- | --- | ---: | ---: | ---: | ---:"
+        "| --- | ---"
+        + mem_sep
+        + " | ---: | ---: | ---: | ---:"
         + k_sep
         + " | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
     )
     rows = [header, sep]
-    for c in sorted(cells, key=lambda x: (x.get("harness", ""), x.get("feedback", ""), x.get("slug", ""))):
+    for c in sorted(
+        cells,
+        key=lambda x: (x.get("harness", ""), x.get("feedback", ""), x.get("memory") or "", x.get("slug", "")),
+    ):
         wall_ms = float(c.get("wall_time_ms") or 0.0)
         roll_ms = c.get("rollout_time_ms_sum")
         roll_s = float(roll_ms) / 1000.0 if roll_ms is not None else None
@@ -83,28 +95,30 @@ def render_cells_table(cells: list[dict[str, Any]]) -> str:
         mean_tok_s = c.get("mean_tokens_success")
         med_tok_s = c.get("median_tokens_success")
         n_succ = c.get("n_judge_success")
-        rows.append(
-            "| "
-            + " | ".join(
-                [
-                    f"`{c.get('slug', '')}`",
-                    f"`{c.get('env_id', '')}`",
-                    _fmt_num(judge_yes, digits=4),
-                    _fmt_num(float(c.get("avg_reward", 0.0))),
-                    _fmt_num(float(c.get("avg_error", 0.0))),
-                    _fmt_num(float(task_m) if task_m is not None else None, digits=4),
-                    *k_cells,
-                    _fmt_int(mean_tok_s) if mean_tok_s is not None else "—",
-                    _fmt_int(med_tok_s) if med_tok_s is not None else "—",
-                    str(int(n_succ)) if n_succ is not None else "—",
-                    str(int(c.get("num_rollouts", 0))),
-                    _fmt_num(wall_ms / 1000.0, digits=1),
-                    _fmt_num(roll_s, digits=1) if roll_s is not None else "—",
-                    tok,
-                ]
-            )
-            + " |"
+        row_parts = [
+            f"`{c.get('slug', '')}`",
+            f"`{c.get('env_id', '')}`",
+        ]
+        if show_mem:
+            m = c.get("memory")
+            row_parts.append(f"`{m}`" if m else "—")
+        row_parts.extend(
+            [
+                _fmt_num(judge_yes, digits=4),
+                _fmt_num(float(c.get("avg_reward", 0.0))),
+                _fmt_num(float(c.get("avg_error", 0.0))),
+                _fmt_num(float(task_m) if task_m is not None else None, digits=4),
+                *k_cells,
+                _fmt_int(mean_tok_s) if mean_tok_s is not None else "—",
+                _fmt_int(med_tok_s) if med_tok_s is not None else "—",
+                str(int(n_succ)) if n_succ is not None else "—",
+                str(int(c.get("num_rollouts", 0))),
+                _fmt_num(wall_ms / 1000.0, digits=1),
+                _fmt_num(roll_s, digits=1) if roll_s is not None else "—",
+                tok,
+            ]
         )
+        rows.append("| " + " | ".join(row_parts) + " |")
     note = (
         "\n\n**Success@K** is the fraction of rollouts where the judge accepted (`judge_reward` ≥ 0.5) "
         "and round count ≤ K. Chat harness uses `num_turns` (assistant generations); "

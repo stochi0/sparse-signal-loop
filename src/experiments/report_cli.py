@@ -10,7 +10,7 @@ from experiments.run_report_md import find_summary_files, load_summary_and_write
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Write REPORT.md next to each experiment summary.json (phase0_lbp, phase0_mini_swe, …)."
+        description="Write REPORT.md next to each experiment summary.json (phase0_*, phase1_*, …)."
     )
     p.add_argument(
         "--root",
