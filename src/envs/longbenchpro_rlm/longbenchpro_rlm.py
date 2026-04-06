@@ -25,8 +25,11 @@ from datasets import load_dataset
 from longbenchpro_rlm_prompts import (
     JudgeFeedbackMode,
     Phase1MemoryMode,
+    Phase2SkillMode,
+    build_phase2_skill_md_template,
     lbp_judge_prompt_for_mode,
     phase1_working_memory_suffix,
+    phase2_skill_suffix,
     resolve_phase1_lbp_filters,
 )
 from verifiers.clients import resolve_client
@@ -59,6 +62,7 @@ def _materialize_rlm_context_dir(
     example_id: str,
     context_text: str,
     task_query_text: str | None,
+    skill_md_text: str | None = None,
 ) -> str:
     """Write passage (and optional file-backed task stem) to a host dir for ``info[\"context_dir\"]``."""
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in example_id).strip("_") or "unknown"
@@ -68,6 +72,8 @@ def _materialize_rlm_context_dir(
     (d / "context.txt").write_text(context_text, encoding="utf-8")
     if task_query_text is not None:
         (d / "task_query.txt").write_text(task_query_text, encoding="utf-8")
+    if skill_md_text is not None:
+        (d / "SKILL.md").write_text(skill_md_text, encoding="utf-8")
     return str(d)
 
 
@@ -395,6 +401,8 @@ def load_environment(
     dataset_start_index: int = 0,
     phase1_slice: bool = False,
     phase1_working_memory: Phase1MemoryMode = "off",
+    phase2_skill_mode: Phase2SkillMode = "off",
+    phase2_skill_max_chars: int = 6000,
     # Judge options (verifiers ClientConfig + JudgeRubric)
     judge_model: str = _DEFAULT_PRIME_JUDGE_MODEL,
     judge_api_key_var: str = "PRIME_API_KEY",
@@ -444,6 +452,9 @@ def load_environment(
         phase1_slice: If True, default to T6.1 clustering @ 32k when ``secondary_task`` / ``token_length`` are broad.
         phase1_working_memory: Phase 1 scaffolding. ``chat`` = notes only in root assistant messages (ablation vs files); \
             ``repl_files`` = canonical notes in REPL workspace files.
+        phase2_skill_mode: Phase 2 harness. ``rlm_skill_file`` seeds ``SKILL.md`` in the REPL workspace (process-only \
+            runbook; judge never sees it). Use ``off`` for Phase 0/1 behavior. Chat-only modes are invalid here.
+        phase2_skill_max_chars: Soft cap communicated in prompts / seed ``SKILL.md`` (not enforced mechanically).
         judge_model: Judge model id on Prime Inference (e.g. ``openai/gpt-4.1-mini`` or ``z-ai/glm-4.7``).
         judge_api_key_var: Environment variable for the judge API key (default ``PRIME_API_KEY``).
         judge_base_url: API base URL for the judge; if None, uses Prime Inference \
@@ -479,6 +490,11 @@ def load_environment(
     Returns:
         Configured environment instance
     """
+    if phase2_skill_mode not in ("off", "rlm_skill_file"):
+        raise ValueError(
+            f"longbenchpro_rlm: phase2_skill_mode must be 'off' or 'rlm_skill_file'; got {phase2_skill_mode!r}"
+        )
+
     cache_root = Path(
         rlm_context_cache_dir
         if rlm_context_cache_dir is not None
@@ -492,6 +508,11 @@ def load_environment(
         token_length=token_length,
     )
     phase1_suffix = phase1_working_memory_suffix(phase1_working_memory, rlm=True)
+    phase2_suffix = phase2_skill_suffix(
+        phase2_skill_mode,
+        rlm=True,
+        max_chars=int(phase2_skill_max_chars),
+    )
 
     # Choose question column based on thinking mode
     question_column = "question_thinking" if thinking else "question_nonthinking"
@@ -511,6 +532,8 @@ def load_environment(
             prompt_content = prompt_content + IN_LOOP_JUDGE_REPL_INSTRUCTION_SUFFIX
         if phase1_suffix:
             prompt_content = prompt_content + phase1_suffix
+        if phase2_suffix:
+            prompt_content = prompt_content + phase2_suffix
 
         task_query_file: str | None
         if prompt_in_context_file:
@@ -519,11 +542,16 @@ def load_environment(
         else:
             task_query_file = None
 
+        skill_md: str | None = None
+        if phase2_skill_mode == "rlm_skill_file":
+            skill_md = build_phase2_skill_md_template(max_chars=int(phase2_skill_max_chars))
+
         context_dir = _materialize_rlm_context_dir(
             cache_root=cache_root,
             example_id=example_id,
             context_text=context_text,
             task_query_text=task_query_file,
+            skill_md_text=skill_md,
         )
 
         return {
@@ -542,6 +570,8 @@ def load_environment(
                 "dataset_example_id": example["id"],
                 "phase1_slice": phase1_slice,
                 "phase1_working_memory": phase1_working_memory,
+                "phase2_skill_mode": phase2_skill_mode,
+                "phase2_skill_max_chars": int(phase2_skill_max_chars),
             },
         }
 

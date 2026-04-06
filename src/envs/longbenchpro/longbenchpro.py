@@ -22,14 +22,18 @@ from datasets import load_dataset
 from longbenchpro_prompts import (
     JudgeFeedbackMode,
     Phase1MemoryMode,
+    Phase2SkillMode,
+    extract_phase2_skill_block,
     lbp_judge_prompt_for_mode,
     phase1_working_memory_suffix,
+    phase2_skill_suffix,
     resolve_phase1_lbp_filters,
 )
 from verifiers.clients import resolve_client
 from verifiers.clients.openai_chat_completions_client import OpenAIChatCompletionsClient
 from verifiers.rubrics.judge_rubric import JudgeRubric
-from verifiers.types import ClientConfig, UserMessage
+from verifiers.types import ClientConfig, Messages, UserMessage
+from verifiers.utils.message_utils import maybe_normalize_messages
 
 
 class _LbpJudge(JudgeRubric):
@@ -252,6 +256,29 @@ def _format_user_prompt(
     return f"{question_stem}\n\n## Long Context\n\n{raw_context}"
 
 
+def _assistant_plain_text_from_messages(completion: vf.Messages) -> str:
+    """Best-effort assistant text for Phase 2 tag parsing (handles string or parts)."""
+    chunks: list[str] = []
+    for msg in completion or []:
+        if isinstance(msg, dict):
+            role = msg.get("role")
+            content = msg.get("content", "")
+        else:
+            role = getattr(msg, "role", None)
+            content = getattr(msg, "content", "")
+        if role != "assistant":
+            continue
+        if isinstance(content, str):
+            chunks.append(content)
+        elif isinstance(content, list):
+            for p in content:
+                if isinstance(p, dict) and p.get("type") == "text":
+                    chunks.append(str(p.get("text", "")))
+        else:
+            chunks.append(str(content or ""))
+    return "\n".join(chunks).strip()
+
+
 class LongBenchProInLoopJudgeEnv(vf.MultiTurnEnv):
     """In-loop LLM judge: runs after each assistant message and returns feedback (``MultiTurnEnv``)."""
 
@@ -289,6 +316,38 @@ class LongBenchProInLoopJudgeEnv(vf.MultiTurnEnv):
         return [follow_up]
 
 
+class LongBenchProPhase2SkillReinjectEnv(LongBenchProInLoopJudgeEnv):
+    """Phase 2 weak baseline: reinject ``<phase2_skill>`` from the prior assistant turn as a leading system message."""
+
+    def __init__(self, *, phase2_skill_max_chars: int = 6000, **kwargs: Any):
+        self._phase2_skill_max_chars = int(phase2_skill_max_chars)
+        super().__init__(**kwargs)
+
+    async def get_prompt_messages(self, state: vf.State) -> Messages:
+        base = await super().get_prompt_messages(state)
+        if len(state["trajectory"]) == 0:
+            return base
+        prev_completion = state["trajectory"][-1].get("completion") or []
+        text = _assistant_plain_text_from_messages(prev_completion)
+        skill = extract_phase2_skill_block(text)
+        if not skill:
+            return base
+        if len(skill) > self._phase2_skill_max_chars:
+            skill = skill[: self._phase2_skill_max_chars] + "\n... (truncated)"
+        sys_msg: dict[str, str] = {
+            "role": "system",
+            "content": (
+                "<phase2_skill_carryover>\n"
+                "Reinjected from your previous assistant message's <phase2_skill> block only. "
+                "Not judge feedback; not ground truth.\n\n"
+                f"{skill}\n"
+                "</phase2_skill_carryover>"
+            ),
+        }
+        merged = [sys_msg, *base]
+        return maybe_normalize_messages(merged, field_name="prompt_messages_phase2_reinject")
+
+
 def load_environment(
     split: str = "test",
     shuffle: bool = False,
@@ -304,6 +363,8 @@ def load_environment(
     dataset_start_index: int = 0,
     phase1_slice: bool = False,
     phase1_working_memory: Phase1MemoryMode = "off",
+    phase2_skill_mode: Phase2SkillMode = "off",
+    phase2_skill_max_chars: int = 6000,
     judge_model: str = _DEFAULT_PRIME_JUDGE_MODEL,
     judge_api_key_var: str = "PRIME_API_KEY",
     judge_base_url: str | None = None,
@@ -337,6 +398,10 @@ def load_environment(
             (override by passing ``secondary_task`` / ``token_length`` explicitly).
         phase1_working_memory: Phase 1 scaffolding — checklist, hypothesis log, “what failed last time”. \
             ``chat`` keeps notes in assistant messages only; ``repl_files`` is invalid here (no REPL).
+        phase2_skill_mode: Phase 2 chat harness. ``chat_no_file`` = iterative judge feedback without a skill file; \
+            ``chat_system_reinject`` = reinject prior ``<phase2_skill>`` block as a system message; ``off`` disables. \
+            ``rlm_skill_file`` is invalid on chat env.
+        phase2_skill_max_chars: Soft cap for reinjected skill text (truncated if longer).
         judge_model: Judge model id on Prime Inference (e.g. ``openai/gpt-4.1-mini`` or ``z-ai/glm-4.7``).
         judge_api_key_var: Env var for the judge API key.
         judge_base_url: API base URL; default Prime Inference.
@@ -352,6 +417,11 @@ def load_environment(
     """
     if phase1_working_memory == "repl_files":
         raise ValueError("longbenchpro has no REPL; use phase1_working_memory='chat' or 'off'.")
+    if phase2_skill_mode not in ("off", "chat_no_file", "chat_system_reinject"):
+        raise ValueError(
+            f"longbenchpro: phase2_skill_mode must be 'off', 'chat_no_file', or 'chat_system_reinject'; "
+            f"got {phase2_skill_mode!r}"
+        )
 
     effective_secondary_task, effective_token_length = resolve_phase1_lbp_filters(
         phase1_slice=phase1_slice,
@@ -359,6 +429,11 @@ def load_environment(
         token_length=token_length,
     )
     phase1_suffix = phase1_working_memory_suffix(phase1_working_memory, rlm=False)
+    phase2_suffix = phase2_skill_suffix(
+        phase2_skill_mode,
+        rlm=False,
+        max_chars=int(phase2_skill_max_chars),
+    )
 
     question_column = "question_thinking" if thinking else "question_nonthinking"
 
@@ -375,6 +450,8 @@ def load_environment(
             question_stem = question_stem + IN_LOOP_JUDGE_INSTRUCTION_SUFFIX
         if phase1_suffix:
             question_stem = question_stem + phase1_suffix
+        if phase2_suffix:
+            question_stem = question_stem + phase2_suffix
 
         user_content = _format_user_prompt(question_stem, raw_context, prompt_in_context_file=prompt_in_context_file)
 
@@ -395,6 +472,8 @@ def load_environment(
                 "prompt_in_context_file": prompt_in_context_file,
                 "phase1_slice": phase1_slice,
                 "phase1_working_memory": phase1_working_memory,
+                "phase2_skill_mode": phase2_skill_mode,
+                "phase2_skill_max_chars": int(phase2_skill_max_chars),
             },
         }
 
@@ -498,11 +577,21 @@ def load_environment(
             **kwargs,
         )
 
-    return LongBenchProInLoopJudgeEnv(
+    env_cls: type[LongBenchProInLoopJudgeEnv] = (
+        LongBenchProPhase2SkillReinjectEnv
+        if phase2_skill_mode == "chat_system_reinject"
+        else LongBenchProInLoopJudgeEnv
+    )
+    reinject_kw: dict[str, Any] = {}
+    if env_cls is LongBenchProPhase2SkillReinjectEnv:
+        reinject_kw["phase2_skill_max_chars"] = int(phase2_skill_max_chars)
+
+    return env_cls(
         judge_rubric=judge_rubric,
         dataset=build_dataset,
         eval_dataset=build_dataset,
         rubric=judge_rubric,
         max_turns=max_turns,
+        **reinject_kw,
         **kwargs,
     )
