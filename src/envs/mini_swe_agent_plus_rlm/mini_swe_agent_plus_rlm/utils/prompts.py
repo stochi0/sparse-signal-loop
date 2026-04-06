@@ -29,6 +29,10 @@ iteratively. The REPL preserves state across calls.
 - MODIFY: Regular source code files
 - DO NOT MODIFY: Tests, configuration files (pyproject.toml, setup.cfg, etc.)
 
+## Workspace vs. chat
+
+The PR description is only in the messages above. Source code lives under `/testbed` (the REPL working tree)—inspect and edit files there. The `.messages` file in the REPL, if you open it, is JSONL for this **conversation** (`role`, `content`, …); it is not the repo and not a shortcut for reading project files.
+
 ## Recommended Workflow
 
 1. Inspect the repo with `execute_bash` (via the allowed path)
