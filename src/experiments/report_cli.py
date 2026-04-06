@@ -5,12 +5,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from experiments.run_report_md import find_summary_files, load_summary_and_write_report
+from experiments.kit.run_report_md import find_summary_files, load_summary_and_write_report
 
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Write REPORT.md next to each experiment summary.json (phase0_*, phase1_*, …)."
+        description="Write REPORT.md next to each experiment summary.json (under outputs/experiments/phase*/…)."
     )
     p.add_argument(
         "--root",
