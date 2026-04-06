@@ -104,7 +104,7 @@ def _msap_judge_verdict(judge_text: str) -> tuple[bool, str]:
     elif first_tok == "YES" or upper_line.startswith("YES"):
         correct = True
     else:
-        correct = "yes" in first_line.lower()
+        correct = False
 
     feedback = "\n".join(lines[1:]).strip()
     if not correct and not feedback:
@@ -867,7 +867,7 @@ print(json.dumps({{"digest": digest, "count": len(items)}}))
     async def _noop_upload_directory(sandbox_id: str, local_dir: str, remote_dir: str) -> None:
         pass
 
-    def customize_worker_script(self, script: str, state: vf.State) -> str:
+    def customize_worker_script(self, script: str, _state: vf.State) -> str:
         """Ensure Python workers use future annotations for forward references."""
         if self.repl_language != "python":
             return script

@@ -141,7 +141,7 @@ def _msap_judge_verdict(judge_text: str) -> tuple[bool, str]:
     elif first_tok == "YES" or upper_line.startswith("YES"):
         correct = True
     else:
-        correct = "yes" in first_line.lower()
+        correct = False
 
     feedback = "\n".join(lines[1:]).strip()
     if not correct and not feedback:
