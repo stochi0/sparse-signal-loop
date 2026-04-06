@@ -53,8 +53,9 @@ uv run vf-eval longbenchpro-rlm -m gpt-5-mini -n 5 -a '{"secondary_task": "T3.2 
 | `shuffle` | bool | `False` | Whether to shuffle the dataset |
 | `seed` | int \| None | `None` | Random seed for shuffling; if `None`, picks a random seed |
 | `thinking` | bool | `False` | If True, use `question_thinking` prompts; otherwise `question_nonthinking` |
-| `include_env_tips` | bool | `False` | Include strategy tips in prompt |
-| `prompt_in_context_file` | bool | `False` | If `False`, the query is in context and extra info in a file; if `True`, both in a file as JSON in `context.txt` |
+| `include_env_tips` | bool | `False` | If True, add chunking / `llm_batch` bullets inside `<env_tips>` (workspace note is always included) |
+| `prompt_in_context_file` | bool | `False` | If `False`, task stem in the user message; passage in `context_dir`/`context.txt`. If `True`, empty user message; task in `task_query.txt`, passage in `context.txt` under `context_dir` |
+| `rlm_context_cache_dir` | str \| Path \| None | `None` | Host cache for per-example `context_dir` trees; default `LBP_RLM_CONTEXT_CACHE` env or `~/.cache/sparse_signal_loop/lbp_rlm_context` |
 | `language` | str | `"English"` | Filter: "English", "Chinese", or "all" |
 | `token_length` | str | `"all"` | Filter: "8k", "16k", "32k", "64k", "128k", "256k", or "all" |
 | `difficulty` | str | `"all"` | Filter: "Easy", "Moderate", "Hard", "Extreme", or "all" |

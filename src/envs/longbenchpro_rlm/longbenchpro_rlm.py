@@ -13,9 +13,11 @@ model-based embeddings that are impractical in this evaluation setting.
 from __future__ import annotations
 
 import json
+import os
 import random
 import re
 from itertools import combinations
+from pathlib import Path
 from typing import Any, Literal
 
 import verifiers as vf
@@ -48,14 +50,51 @@ class _LbpJudge(JudgeRubric):
 # Environment Tips (for SFT data generation)
 # =============================================================================
 
-_ENV_TIPS = """
-<env_tips>
-Strategy for long-context information retrieval:
-1. Split the context into chunks (e.g., by paragraphs or fixed character windows with some overlap)
-2. Write a prompt describing what to look for, then append it to each chunk to create a list of prompts
-3. Call llm_batch() once with all prompts to scan chunks in parallel
-4. Aggregate the relevant findings from the responses
-</env_tips>"""
+_DEFAULT_RLM_CONTEXT_CACHE = Path.home() / ".cache" / "sparse_signal_loop" / "lbp_rlm_context"
+
+
+def _materialize_rlm_context_dir(
+    *,
+    cache_root: Path,
+    example_id: str,
+    context_text: str,
+    task_query_text: str | None,
+) -> str:
+    """Write passage (and optional file-backed task stem) to a host dir for ``info[\"context_dir\"]``."""
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in example_id).strip("_") or "unknown"
+    safe = safe[:180]
+    d = (cache_root / safe).resolve()
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "context.txt").write_text(context_text, encoding="utf-8")
+    if task_query_text is not None:
+        (d / "task_query.txt").write_text(task_query_text, encoding="utf-8")
+    return str(d)
+
+
+def _env_tips_markup(*, include_strategy: bool) -> str:
+    """RLM workspace note is always included; chunking strategy only when ``include_env_tips``."""
+    lines = [
+        "<env_tips>",
+        "**Where the long context lives (RLM):** The host directory in ``info[\"context_dir\"]`` is copied into your "
+        "REPL workspace. LongBench-Pro materializes ``context.txt`` (the passage). When ``prompt_in_context_file`` is "
+        "True, ``task_query.txt`` holds the full written instructions (including these tips) because the root user "
+        "message may be empty. The ``.messages`` file is chat JSONL (`role`, `content`, …); it is not the benchmark "
+        "text unless you copy it there yourself.",
+    ]
+    if include_strategy:
+        lines.extend(
+            [
+                "",
+                "Strategy for long-context information retrieval:",
+                "1. Split the context into chunks (e.g., by paragraphs or fixed character windows with some overlap)",
+                "2. Write a prompt describing what to look for, then append it to each chunk to create a list of prompts",
+                "3. Call llm_batch() once with all prompts to scan chunks in parallel",
+                "4. Aggregate the relevant findings from the responses",
+            ]
+        )
+    lines.extend(["", "</env_tips>"])
+    return "\n".join(lines)
+
 
 # When in_loop_judge is on, explain submit-gated judging for REPL workflows.
 IN_LOOP_JUDGE_REPL_INSTRUCTION_SUFFIX = """\n\nWhen you submit a final answer from the REPL (answer['ready'] = True in Python, \
@@ -382,6 +421,7 @@ def load_environment(
     sandbox_disk_size_gb: int = 5,
     sandbox_gpu_count: int = 0,
     sandbox_timeout_minutes: int = 60,
+    rlm_context_cache_dir: str | Path | None = None,
     **kwargs: Any,
 ) -> vf.Environment:
     """
@@ -392,8 +432,9 @@ def load_environment(
         shuffle: Whether to shuffle the dataset.
         seed: Random seed for shuffling.
         thinking: If True, use question_thinking prompts; otherwise question_nonthinking.
-        include_env_tips: If True, include environment-specific strategy tips in the prompt.
-        prompt_in_context_file: If True, store both query and context in a file.
+        include_env_tips: If True, include chunking / ``llm_batch`` strategy bullets inside ``<env_tips>``.
+        prompt_in_context_file: If True, empty root user message; full task text is in ``task_query.txt`` under \
+            ``context_dir``, passage in ``context.txt``.
         language: Filter by language ("English", "Chinese", or "all"). Defaults to "English".
         token_length: Filter by context token length ("8k", "16k", "32k", "64k", "128k", "256k", or "all").
         difficulty: Filter by difficulty level ("Easy", "Moderate", "Hard", "Extreme", or "all").
@@ -430,11 +471,21 @@ def load_environment(
         sandbox_disk_size_gb: Disk size in GB for sandbox.
         sandbox_gpu_count: Number of GPUs for sandbox.
         sandbox_timeout_minutes: Overall sandbox lifetime in minutes.
+        rlm_context_cache_dir: Host directory where per-example folders (``context.txt``, optional ``task_query.txt``) \
+            are written for ``info[\"context_dir\"]``. Default: env ``LBP_RLM_CONTEXT_CACHE`` or \
+            ``~/.cache/sparse_signal_loop/lbp_rlm_context``.
         **kwargs: Additional arguments passed through to the harness base class.
 
     Returns:
         Configured environment instance
     """
+    cache_root = Path(
+        rlm_context_cache_dir
+        if rlm_context_cache_dir is not None
+        else os.environ.get("LBP_RLM_CONTEXT_CACHE", str(_DEFAULT_RLM_CONTEXT_CACHE))
+    ).expanduser()
+    cache_root.mkdir(parents=True, exist_ok=True)
+
     effective_secondary_task, effective_token_length = resolve_phase1_lbp_filters(
         phase1_slice=phase1_slice,
         secondary_task=secondary_task,
@@ -448,22 +499,32 @@ def load_environment(
     # Transform dataset into the required format
     def transform_example(example: dict[str, Any], idx: int) -> dict[str, Any]:
         question = example[question_column]
-        context = example["context"]
+        context_text: str = example["context"]
         answers = example["answer"]  # list[str]
         sec_task = example["secondary_task"]
+        example_id = str(example["id"])
 
         # Build the prompt
         prompt_content = question
-        if include_env_tips:
-            prompt_content = prompt_content + _ENV_TIPS
+        prompt_content = prompt_content + _env_tips_markup(include_strategy=include_env_tips)
         if in_loop_judge:
             prompt_content = prompt_content + IN_LOOP_JUDGE_REPL_INSTRUCTION_SUFFIX
         if phase1_suffix:
             prompt_content = prompt_content + phase1_suffix
 
+        task_query_file: str | None
         if prompt_in_context_file:
-            context = {"query": prompt_content, "context": context}
+            task_query_file = prompt_content
             prompt_content = ""
+        else:
+            task_query_file = None
+
+        context_dir = _materialize_rlm_context_dir(
+            cache_root=cache_root,
+            example_id=example_id,
+            context_text=context_text,
+            task_query_text=task_query_file,
+        )
 
         return {
             "example_id": idx,
@@ -471,7 +532,7 @@ def load_environment(
             "task": "longbenchpro",
             "answer": json.dumps(answers),  # Serialize list as JSON string
             "info": {
-                "context": context,
+                "context_dir": context_dir,
                 "raw_question": question,
                 "secondary_task": sec_task,
                 "primary_task": example["primary_task"],
