@@ -27,6 +27,17 @@ from verifiers.envs.experimental.rlm_env import RLMEnv
 from verifiers.rubrics.judge_rubric import JudgeRubric
 from verifiers.types import ClientConfig, ToolMessage
 
+
+class _LbpJudge(JudgeRubric):
+    """Catch ``RuntimeError`` from ``JudgeRubric.judge`` (API failures) → synthetic ``NO`` for retry."""
+
+    async def judge(self, prompt, completion, answer, state=None):
+        try:
+            return await super().judge(prompt, completion, answer, state)
+        except RuntimeError as e:
+            return f"NO\nJudge call failed ({e}). Revise and retry when available."
+
+
 # =============================================================================
 # Environment Tips (for SFT data generation)
 # =============================================================================
@@ -505,7 +516,7 @@ def load_environment(
         )
     judge_async_client = judge_wrapped.client
 
-    judge_rubric = JudgeRubric(
+    judge_rubric = _LbpJudge(
         judge_client=judge_async_client,
         judge_model=judge_model,
         judge_prompt=lbp_judge_prompt_for_mode(judge_feedback_mode),
