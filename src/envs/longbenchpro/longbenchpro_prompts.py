@@ -68,3 +68,82 @@ def lbp_judge_prompt_for_mode(mode: JudgeFeedbackMode) -> str:
 
 
 LBP_JUDGE_PROMPT = lbp_judge_prompt_for_mode("total_score")
+
+# =============================================================================
+# Phase 1 — working-memory scaffolding (prompting only; compare chat vs REPL files in RLM)
+# =============================================================================
+
+Phase1MemoryMode = Literal["off", "chat", "repl_files"]
+
+PHASE1_LBP_DEFAULT_SECONDARY_TASK = "T6.1 Large-Scale Document Clustering"
+PHASE1_LBP_DEFAULT_TOKEN_LENGTH = "32k"
+
+_PHASE1_CORE = """<phase1_working_memory>
+Phase 1 — structured working memory (prompting only; no RL):
+
+Throughout the episode, maintain lightweight structure so you do not repeat dead ends:
+- A short checklist (about five bullets max) of what remains to verify or answer.
+- A one-to-two-line hypothesis log: your current best guess and why.
+- After each failed attempt, wrong answer, or judge/tool rejection, append one line to
+  “what failed last time” (describe the symptom or feedback only; do not invent ground truth).
+
+Update these artifacts as you learn. They are for your own coordination, not part of the final answer format
+unless the task explicitly asks for them.
+</phase1_working_memory>"""
+
+_PHASE1_CHAT_WHERE = """<phase1_memory_location_chat>
+Store all of the above only in your assistant messages (plain text, e.g. at the start or end of each turn).
+The chat transcript is your only durable notebook—there is no separate persistent note file for this purpose.
+Compress or rewrite earlier notes when they grow too long.
+</phase1_memory_location_chat>"""
+
+_PHASE1_REPL_FILES_WHERE = """<phase1_memory_location_repl_files>
+Persist the checklist, hypothesis log, and “what failed last time” lines in the REPL workspace as plain text
+(e.g. ``working_notes.md`` in the current directory or ``/tmp/phase1_notes.txt``). At the start of substantive
+REPL work each turn, read them back; after discoveries or rejections, update them. You may briefly summarize
+in chat, but the canonical copy must live in those files so it survives across REPL calls.
+</phase1_memory_location_repl_files>"""
+
+_PHASE1_RLM_CHAT_ABLATION = """<phase1_memory_location_rlm_chat_ablation>
+Use the same checklist, hypothesis, and failure log as above, but keep them only in your root assistant messages
+(between REPL tool calls). Do not rely on note files in the REPL for this ablation—even though the REPL exists,
+treat chat as the sole external memory for Phase 1 notes.
+</phase1_memory_location_rlm_chat_ablation>"""
+
+
+def phase1_working_memory_suffix(
+    mode: Phase1MemoryMode,
+    *,
+    rlm: bool,
+) -> str:
+    """Append to the task query stem. ``repl_files`` requires ``rlm=True``."""
+    if mode == "off":
+        return ""
+    blocks = [_PHASE1_CORE]
+    if mode == "chat":
+        blocks.append(_PHASE1_RLM_CHAT_ABLATION if rlm else _PHASE1_CHAT_WHERE)
+    elif mode == "repl_files":
+        if not rlm:
+            raise ValueError("phase1_working_memory='repl_files' is only valid for RLM environments.")
+        blocks.append(_PHASE1_REPL_FILES_WHERE)
+    else:
+        raise ValueError(f"Unknown phase1_working_memory mode: {mode!r}")
+    return "\n\n" + "\n\n".join(blocks)
+
+
+def resolve_phase1_lbp_filters(
+    *,
+    phase1_slice: bool,
+    secondary_task: str | None,
+    token_length: str,
+) -> tuple[str | None, str]:
+    """When ``phase1_slice``, default to T6.1 @ 32k if filters are still broad."""
+    st = secondary_task
+    tl = token_length
+    if not phase1_slice:
+        return st, tl
+    if st is None:
+        st = PHASE1_LBP_DEFAULT_SECONDARY_TASK
+    if tl == "all":
+        tl = PHASE1_LBP_DEFAULT_TOKEN_LENGTH
+    return st, tl

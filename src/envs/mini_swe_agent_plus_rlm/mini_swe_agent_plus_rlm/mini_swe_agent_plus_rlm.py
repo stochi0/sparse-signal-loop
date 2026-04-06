@@ -45,7 +45,10 @@ from .mini_swe_judge_prompts import (
 from .utils.execution_log_parser import decolor_dict_keys, parse_log_fn
 from .utils.prompts import (
     ACTION_OBSERVATION_TEMPLATE,
+    PHASE1_MSWE_DEFAULT_ONLY_REPOS,
     REPL_PROMPT_TEMPLATE,
+    Phase1MemoryMode,
+    phase1_working_memory_suffix,
     render_template,
 )
 from .utils.sandbox_retry import (
@@ -141,6 +144,9 @@ def _process_example(
     prompt_template: str,
     repl_tool_name: str,
     custom_instructions: str = "",
+    phase1_suffix: str = "",
+    phase1_slice: bool = False,
+    phase1_working_memory: str = "off",
 ):
     """Process dataset example into rollout input format. Module-level for stable caching."""
     # Escape braces in problem statements to keep str.format from treating them as placeholders.
@@ -151,9 +157,16 @@ def _process_example(
     )
     if custom_instructions.strip():
         question += f"\n\n<custom_instructions>\n{custom_instructions.strip()}\n</custom_instructions>"
+    if phase1_suffix:
+        question += phase1_suffix
+    info = {
+        **x,
+        "phase1_slice": phase1_slice,
+        "phase1_working_memory": phase1_working_memory,
+    }
     return {
         "question": question,
-        "info": {**x},
+        "info": info,
         "answer": _judge_reference_from_row(x),
     }
 
@@ -1240,7 +1253,10 @@ def load_environment(
     sandbox_labels: list[str] | None = None,
     allow_git: bool = False,
     filter_repos: list[str] | None = None,
+    only_repos: list[str] | None = None,
     dataset_start_index: int = 0,
+    phase1_slice: bool = False,
+    phase1_working_memory: Phase1MemoryMode = "off",
     tools_on_root: bool = False,
     tools_in_repl: bool = False,
     tools_on_sub: bool = True,
@@ -1337,6 +1353,18 @@ def load_environment(
         raise ValueError(f"sandbox_labels must be of type list[str]; you provided {sandbox_labels}")
     sandbox_labels = list(set(sandbox_labels))
 
+    harness = get_harness(dataset_name)
+    effective_only_repos = list(only_repos) if only_repos else None
+    if phase1_slice and effective_only_repos is None and harness == "swebench":
+        effective_only_repos = list(PHASE1_MSWE_DEFAULT_ONLY_REPOS)
+    elif phase1_slice and effective_only_repos is None and harness == "r2e":
+        logging.getLogger(__name__).warning(
+            "phase1_slice=True on R2E without only_repos: no repo filter applied. "
+            "Pass only_repos=['repo_name', ...] to pin a single-repo slice."
+        )
+
+    phase1_suffix = phase1_working_memory_suffix(phase1_working_memory, rlm=True)
+
     repl_tool_name = "call_bash_repl" if repl_language == "bash" else "call_python_repl"
 
     ci_effective = custom_instructions.strip() if custom_instructions else ""
@@ -1355,6 +1383,14 @@ def load_environment(
                 load_from_cache_file=use_dataset_cache,
             )
 
+        if effective_only_repos:
+            keep = set(effective_only_repos)
+            ds = ds.filter(
+                lambda x: (x.get("repo") or x.get("repo_name")) in keep,
+                keep_in_memory=not use_dataset_cache,
+                load_from_cache_file=use_dataset_cache,
+            )
+
         ds = ds.map(
             _process_example,
             remove_columns=ds.column_names,
@@ -1362,6 +1398,9 @@ def load_environment(
                 "prompt_template": REPL_PROMPT_TEMPLATE,
                 "repl_tool_name": repl_tool_name,
                 "custom_instructions": ci_effective,
+                "phase1_suffix": phase1_suffix,
+                "phase1_slice": phase1_slice,
+                "phase1_working_memory": phase1_working_memory,
             },
             keep_in_memory=not use_dataset_cache,
             load_from_cache_file=use_dataset_cache,
@@ -1373,7 +1412,6 @@ def load_environment(
             ds = ds.select(range(dataset_start_index, n_total))
         return ds
 
-    harness = get_harness(dataset_name)
     parser = vf.Parser()
 
     deep_rubric = DeepSweRubric(

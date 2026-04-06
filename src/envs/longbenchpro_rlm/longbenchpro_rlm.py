@@ -20,7 +20,13 @@ from typing import Any, Literal
 
 import verifiers as vf
 from datasets import load_dataset
-from longbenchpro_rlm_prompts import JudgeFeedbackMode, lbp_judge_prompt_for_mode
+from longbenchpro_rlm_prompts import (
+    JudgeFeedbackMode,
+    Phase1MemoryMode,
+    lbp_judge_prompt_for_mode,
+    phase1_working_memory_suffix,
+    resolve_phase1_lbp_filters,
+)
 from verifiers.clients import resolve_client
 from verifiers.clients.openai_chat_completions_client import OpenAIChatCompletionsClient
 from verifiers.envs.experimental.rlm_env import RLMEnv
@@ -348,6 +354,8 @@ def load_environment(
     primary_task: str | None = None,
     secondary_task: str | None = None,
     dataset_start_index: int = 0,
+    phase1_slice: bool = False,
+    phase1_working_memory: Phase1MemoryMode = "off",
     # Judge options (verifiers ClientConfig + JudgeRubric)
     judge_model: str = _DEFAULT_PRIME_JUDGE_MODEL,
     judge_api_key_var: str = "PRIME_API_KEY",
@@ -392,6 +400,9 @@ def load_environment(
         primary_task: Filter by primary task (e.g., "T1. Retrieval & Ranking").
         secondary_task: Filter by secondary task (e.g., "T3.2 Single-Hop Fact QA").
         dataset_start_index: Skip the first N rows after filters and transform.
+        phase1_slice: If True, default to T6.1 clustering @ 32k when ``secondary_task`` / ``token_length`` are broad.
+        phase1_working_memory: Phase 1 scaffolding. ``chat`` = notes only in root assistant messages (ablation vs files); \
+            ``repl_files`` = canonical notes in REPL workspace files.
         judge_model: Judge model id on Prime Inference (e.g. ``openai/gpt-4.1-mini`` or ``z-ai/glm-4.7``).
         judge_api_key_var: Environment variable for the judge API key (default ``PRIME_API_KEY``).
         judge_base_url: API base URL for the judge; if None, uses Prime Inference \
@@ -424,6 +435,13 @@ def load_environment(
     Returns:
         Configured environment instance
     """
+    effective_secondary_task, effective_token_length = resolve_phase1_lbp_filters(
+        phase1_slice=phase1_slice,
+        secondary_task=secondary_task,
+        token_length=token_length,
+    )
+    phase1_suffix = phase1_working_memory_suffix(phase1_working_memory, rlm=True)
+
     # Choose question column based on thinking mode
     question_column = "question_thinking" if thinking else "question_nonthinking"
 
@@ -440,6 +458,8 @@ def load_environment(
             prompt_content = prompt_content + _ENV_TIPS
         if in_loop_judge:
             prompt_content = prompt_content + IN_LOOP_JUDGE_REPL_INSTRUCTION_SUFFIX
+        if phase1_suffix:
+            prompt_content = prompt_content + phase1_suffix
 
         if prompt_in_context_file:
             context = {"query": prompt_content, "context": context}
@@ -459,6 +479,8 @@ def load_environment(
                 "language": example["language"],
                 "token_length": example["token_length"],
                 "dataset_example_id": example["id"],
+                "phase1_slice": phase1_slice,
+                "phase1_working_memory": phase1_working_memory,
             },
         }
 
@@ -474,14 +496,14 @@ def load_environment(
         # Apply filters
         if language != "all":
             raw_dataset = raw_dataset.filter(lambda x: x["language"] == language)
-        if token_length != "all":
-            raw_dataset = raw_dataset.filter(lambda x: x["token_length"] == token_length)
+        if effective_token_length != "all":
+            raw_dataset = raw_dataset.filter(lambda x: x["token_length"] == effective_token_length)
         if difficulty != "all":
             raw_dataset = raw_dataset.filter(lambda x: x["difficulty"] == difficulty)
         if primary_task is not None:
             raw_dataset = raw_dataset.filter(lambda x: x["primary_task"] == primary_task)
-        if secondary_task is not None:
-            raw_dataset = raw_dataset.filter(lambda x: x["secondary_task"] == secondary_task)
+        if effective_secondary_task is not None:
+            raw_dataset = raw_dataset.filter(lambda x: x["secondary_task"] == effective_secondary_task)
 
         dataset = raw_dataset.map(
             transform_example,

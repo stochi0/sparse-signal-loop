@@ -19,7 +19,13 @@ from typing import Any, Literal
 
 import verifiers as vf
 from datasets import load_dataset
-from longbenchpro_prompts import JudgeFeedbackMode, lbp_judge_prompt_for_mode
+from longbenchpro_prompts import (
+    JudgeFeedbackMode,
+    Phase1MemoryMode,
+    lbp_judge_prompt_for_mode,
+    phase1_working_memory_suffix,
+    resolve_phase1_lbp_filters,
+)
 from verifiers.clients import resolve_client
 from verifiers.clients.openai_chat_completions_client import OpenAIChatCompletionsClient
 from verifiers.rubrics.judge_rubric import JudgeRubric
@@ -296,6 +302,8 @@ def load_environment(
     primary_task: str | None = None,
     secondary_task: str | None = None,
     dataset_start_index: int = 0,
+    phase1_slice: bool = False,
+    phase1_working_memory: Phase1MemoryMode = "off",
     judge_model: str = _DEFAULT_PRIME_JUDGE_MODEL,
     judge_api_key_var: str = "PRIME_API_KEY",
     judge_base_url: str | None = None,
@@ -325,6 +333,10 @@ def load_environment(
         primary_task: Optional primary task filter.
         secondary_task: Optional secondary task filter.
         dataset_start_index: Skip the first N rows after filters and transform.
+        phase1_slice: If True, pin a fixed “hard” slice when filters are still broad: T6.1 clustering @ 32k context \
+            (override by passing ``secondary_task`` / ``token_length`` explicitly).
+        phase1_working_memory: Phase 1 scaffolding — checklist, hypothesis log, “what failed last time”. \
+            ``chat`` keeps notes in assistant messages only; ``repl_files`` is invalid here (no REPL).
         judge_model: Judge model id on Prime Inference (e.g. ``openai/gpt-4.1-mini`` or ``z-ai/glm-4.7``).
         judge_api_key_var: Env var for the judge API key.
         judge_base_url: API base URL; default Prime Inference.
@@ -338,6 +350,16 @@ def load_environment(
         max_turns: Max assistant messages when ``in_loop_judge`` is True.
         **kwargs: Forwarded to ``SingleTurnEnv`` / ``MultiTurnEnv``.
     """
+    if phase1_working_memory == "repl_files":
+        raise ValueError("longbenchpro has no REPL; use phase1_working_memory='chat' or 'off'.")
+
+    effective_secondary_task, effective_token_length = resolve_phase1_lbp_filters(
+        phase1_slice=phase1_slice,
+        secondary_task=secondary_task,
+        token_length=token_length,
+    )
+    phase1_suffix = phase1_working_memory_suffix(phase1_working_memory, rlm=False)
+
     question_column = "question_thinking" if thinking else "question_nonthinking"
 
     def transform_example(example: dict[str, Any], idx: int) -> dict[str, Any]:
@@ -351,6 +373,8 @@ def load_environment(
             question_stem = question_stem + _ENV_TIPS
         if in_loop_judge:
             question_stem = question_stem + IN_LOOP_JUDGE_INSTRUCTION_SUFFIX
+        if phase1_suffix:
+            question_stem = question_stem + phase1_suffix
 
         user_content = _format_user_prompt(question_stem, raw_context, prompt_in_context_file=prompt_in_context_file)
 
@@ -369,6 +393,8 @@ def load_environment(
                 "token_length": example["token_length"],
                 "dataset_example_id": example["id"],
                 "prompt_in_context_file": prompt_in_context_file,
+                "phase1_slice": phase1_slice,
+                "phase1_working_memory": phase1_working_memory,
             },
         }
 
@@ -381,14 +407,14 @@ def load_environment(
 
         if language != "all":
             raw_dataset = raw_dataset.filter(lambda x: x["language"] == language)
-        if token_length != "all":
-            raw_dataset = raw_dataset.filter(lambda x: x["token_length"] == token_length)
+        if effective_token_length != "all":
+            raw_dataset = raw_dataset.filter(lambda x: x["token_length"] == effective_token_length)
         if difficulty != "all":
             raw_dataset = raw_dataset.filter(lambda x: x["difficulty"] == difficulty)
         if primary_task is not None:
             raw_dataset = raw_dataset.filter(lambda x: x["primary_task"] == primary_task)
-        if secondary_task is not None:
-            raw_dataset = raw_dataset.filter(lambda x: x["secondary_task"] == secondary_task)
+        if effective_secondary_task is not None:
+            raw_dataset = raw_dataset.filter(lambda x: x["secondary_task"] == effective_secondary_task)
 
         dataset = raw_dataset.map(
             transform_example,

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Literal
+
 from jinja2 import StrictUndefined, Template
 
 
@@ -171,3 +175,59 @@ If you really need to see something from the full command's output, you can redi
 FORMAT_ERROR_TEMPLATE = """Please always provide EXACTLY ONE tool call, found {{actions|length}} tool calls.
 
 If you have completed your assignment, follow the submission instructions in the first user message."""
+
+# Phase 1 — working memory scaffolding (prompting only; ``repl_files`` only for RLM package)
+Phase1MemoryMode = Literal["off", "chat", "repl_files"]
+
+PHASE1_MSWE_DEFAULT_ONLY_REPOS: tuple[str, ...] = ("django/django",)
+
+_PHASE1_CORE = """<phase1_working_memory>
+Phase 1 — structured working memory (prompting only; no RL):
+
+Throughout the episode, maintain lightweight structure so you do not repeat dead ends:
+- A short checklist (about five bullets max) of what remains to verify or answer.
+- A one-to-two-line hypothesis log: your current best guess and why.
+- After each failed attempt, wrong answer, or judge/tool rejection, append one line to
+  “what failed last time” (describe the symptom or feedback only; do not invent ground truth).
+
+Update these artifacts as you learn. They are for your own coordination, not part of the final answer format
+unless the task explicitly asks for them.
+</phase1_working_memory>"""
+
+_PHASE1_CHAT_WHERE = """<phase1_memory_location_chat>
+Store all of the above only in your assistant messages (plain text before or after your single tool call in each turn).
+The chat transcript is your only durable notebook—there is no separate persistent note file for this purpose.
+Compress or rewrite earlier notes when they grow too long.
+</phase1_memory_location_chat>"""
+
+_PHASE1_REPL_FILES_WHERE = """<phase1_memory_location_repl_files>
+Persist the checklist, hypothesis log, and “what failed last time” lines in the sandbox as plain text under ``/testbed``
+(e.g. ``/testbed/working_notes.md``). Read them back at the start of substantive work after tool results; update them
+after discoveries or rejections. You may briefly summarize in chat, but the canonical copy must live in those files.
+</phase1_memory_location_repl_files>"""
+
+_PHASE1_RLM_CHAT_ABLATION = """<phase1_memory_location_rlm_chat_ablation>
+Use the same checklist, hypothesis, and failure log as above, but keep them only in your root assistant messages
+(between REPL tool calls). Do not rely on note files in the sandbox for this ablation—even though the REPL exists,
+treat chat as the sole external memory for Phase 1 notes.
+</phase1_memory_location_rlm_chat_ablation>"""
+
+
+def phase1_working_memory_suffix(
+    mode: Phase1MemoryMode,
+    *,
+    rlm: bool,
+) -> str:
+    """Append to the first user message body. ``repl_files`` requires ``rlm=True``."""
+    if mode == "off":
+        return ""
+    blocks = [_PHASE1_CORE]
+    if mode == "chat":
+        blocks.append(_PHASE1_RLM_CHAT_ABLATION if rlm else _PHASE1_CHAT_WHERE)
+    elif mode == "repl_files":
+        if not rlm:
+            raise ValueError("phase1_working_memory='repl_files' is only valid for mini_swe_agent_plus_rlm.")
+        blocks.append(_PHASE1_REPL_FILES_WHERE)
+    else:
+        raise ValueError(f"Unknown phase1_working_memory mode: {mode!r}")
+    return "\n\n" + "\n\n".join(blocks)

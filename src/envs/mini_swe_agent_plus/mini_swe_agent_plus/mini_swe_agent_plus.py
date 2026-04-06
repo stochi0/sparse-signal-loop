@@ -46,8 +46,11 @@ from .utils.execution_log_parser import decolor_dict_keys, parse_log_fn
 from .utils.prompts import (
     ACTION_OBSERVATION_TEMPLATE,
     FORMAT_ERROR_TEMPLATE,
+    PHASE1_MSWE_DEFAULT_ONLY_REPOS,
     PROMPT_TEMPLATE,
     SYSTEM_PROMPT,
+    Phase1MemoryMode,
+    phase1_working_memory_suffix,
     render_template,
 )
 from .utils.sandbox_retry import (
@@ -113,14 +116,28 @@ def _judge_reference_from_row(x: dict[str, Any]) -> str:
     )
 
 
-def _process_example(x: dict[str, Any], *, in_loop_suffix: str = ""):
+def _process_example(
+    x: dict[str, Any],
+    *,
+    in_loop_suffix: str = "",
+    phase1_suffix: str = "",
+    phase1_slice: bool = False,
+    phase1_working_memory: str = "off",
+):
     """Process dataset example into rollout input format. Module-level for stable caching."""
     body = PROMPT_TEMPLATE.format(problem_statement=x["problem_statement"])
     if in_loop_suffix:
         body += in_loop_suffix
+    if phase1_suffix:
+        body += phase1_suffix
+    info = {
+        **x,
+        "phase1_slice": phase1_slice,
+        "phase1_working_memory": phase1_working_memory,
+    }
     return {
         "question": body,
-        "info": {**x},
+        "info": info,
         "answer": _judge_reference_from_row(x),
     }
 
@@ -1202,7 +1219,10 @@ def load_environment(
     max_command_timeouts: int = 5,
     allow_git: bool = False,
     filter_repos: list[str] | None = None,
+    only_repos: list[str] | None = None,
     dataset_start_index: int = 0,
+    phase1_slice: bool = False,
+    phase1_working_memory: Phase1MemoryMode = "off",
     skip_swebench_install: bool = True,
     logger: Any = None,
     in_loop_judge: bool = False,
@@ -1213,8 +1233,23 @@ def load_environment(
     judge_sampling_args: dict[str, Any] | None = None,
     judge_feedback_mode: JudgeFeedbackMode = "total_score",
 ) -> vf.Environment:
+    if phase1_working_memory == "repl_files":
+        raise ValueError("mini_swe_agent_plus has no REPL; use phase1_working_memory='chat' or 'off'.")
+
     split = "test" if "bench" in dataset_name.lower() else "train"
+    harness = get_harness(dataset_name)
     in_loop_suffix = IN_LOOP_JUDGE_INSTRUCTION_SUFFIX if in_loop_judge else ""
+
+    effective_only_repos = list(only_repos) if only_repos else None
+    if phase1_slice and effective_only_repos is None and harness == "swebench":
+        effective_only_repos = list(PHASE1_MSWE_DEFAULT_ONLY_REPOS)
+    elif phase1_slice and effective_only_repos is None and harness == "r2e":
+        logging.getLogger(__name__).warning(
+            "phase1_slice=True on R2E without only_repos: no repo filter applied. "
+            "Pass only_repos=['repo_name', ...] to pin a single-repo slice."
+        )
+
+    phase1_suffix = phase1_working_memory_suffix(phase1_working_memory, rlm=False)
 
     if in_loop_judge and max_turns < 50:
         logging.getLogger(__name__).warning(
@@ -1230,9 +1265,18 @@ def load_environment(
             filter_set = set(filter_repos)
             ds = ds.filter(lambda x: filter_set.isdisjoint((x.get("repo"), x.get("repo_name"))))
 
+        if effective_only_repos:
+            keep = set(effective_only_repos)
+            ds = ds.filter(lambda x: (x.get("repo") or x.get("repo_name")) in keep)
+
         ds = ds.map(
             _process_example,
-            fn_kwargs={"in_loop_suffix": in_loop_suffix},
+            fn_kwargs={
+                "in_loop_suffix": in_loop_suffix,
+                "phase1_suffix": phase1_suffix,
+                "phase1_slice": phase1_slice,
+                "phase1_working_memory": phase1_working_memory,
+            },
             remove_columns=ds.column_names,
         )
         if dataset_start_index > 0:
@@ -1242,7 +1286,6 @@ def load_environment(
             ds = ds.select(range(dataset_start_index, n_total))
         return ds
 
-    harness = get_harness(dataset_name)
     parser = vf.Parser()
 
     deep_rubric = DeepSweRubric(
