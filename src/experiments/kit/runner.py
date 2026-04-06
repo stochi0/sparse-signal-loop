@@ -12,6 +12,7 @@ from verifiers.utils.eval_utils import quiet_datasets
 
 from experiments.kit.artifacts import write_run_summary
 from experiments.kit.cells import parse_cell_filter
+from experiments.kit.harness_contrast import phase1_harness_contrast_applicable, print_phase1_harness_contrast
 from experiments.kit.registry import default_run_directory
 from experiments.kit.reporting import CellRunSummary, print_comparison_table
 
@@ -57,4 +58,6 @@ async def run_sequential_factorial(
     print(f"\n{completion_banner}: {base.resolve()}")
     print(f"Markdown report: {report_path.resolve()}\n")
     print_comparison_table(rows)
+    if phase1_harness_contrast_applicable(rows):
+        print_phase1_harness_contrast(rows)
     return rows

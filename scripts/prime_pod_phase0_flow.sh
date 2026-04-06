@@ -106,7 +106,7 @@ cmd_bootstrap() {
   fi
 
   (cd "${REPO_DIR}" && uv sync)
-  echo "Bootstrap done. Ensure .env is in ${REPO_DIR} (or set ENV_FILE), then: $0 run-lbp | run-msap | run-both"
+  echo "Bootstrap done. Ensure .env is in ${REPO_DIR} (or set ENV_FILE), then: $0 run-lbp | run-msap | run-both | run-phase1-lbp | run-phase1-msap"
 }
 
 _run_in_tmux() {
@@ -147,6 +147,22 @@ cmd_run_both() {
   echo "Both started in separate tmux sessions: ${TMUX_SESSION}-lbp and ${TMUX_SESSION}-msap"
 }
 
+cmd_run_phase1_lbp() {
+  [[ -d "${REPO_DIR}" ]] || die "REPO_DIR missing: ${REPO_DIR} (run bootstrap first)"
+  [[ -n "${PRIME_API_KEY:-}" ]] || echo "warning: PRIME_API_KEY is unset"
+
+  _run_in_tmux "${TMUX_SESSION}-p1-lbp" \
+    "uv run ssl-phase1-lbp -m '${POLICY_MODEL}' --judge-model '${JUDGE_MODEL}' -n ${NUM_EXAMPLES} --dataset-start-index ${DATASET_START_INDEX} -r ${ROLLOUTS}"
+}
+
+cmd_run_phase1_msap() {
+  [[ -d "${REPO_DIR}" ]] || die "REPO_DIR missing: ${REPO_DIR} (run bootstrap first)"
+  [[ -n "${PRIME_API_KEY:-}" ]] || echo "warning: PRIME_API_KEY is unset"
+
+  _run_in_tmux "${TMUX_SESSION}-p1-msap" \
+    "uv run ssl-phase1-msap -m '${POLICY_MODEL}' --judge-model '${JUDGE_MODEL}' -n ${NUM_EXAMPLES} --dataset-start-index ${DATASET_START_INDEX} -r ${ROLLOUTS}"
+}
+
 cmd_help() {
   cat <<EOF
 Usage: $0 <command>
@@ -157,6 +173,8 @@ Usage: $0 <command>
   run-lbp      On pod: tmux session ${TMUX_SESSION}-lbp → ssl-phase0-lbp
   run-msap     On pod: tmux session ${TMUX_SESSION}-msap → ssl-phase0-msap
   run-both     On pod: start both tmux sessions
+  run-phase1-lbp   On pod: ${TMUX_SESSION}-p1-lbp → ssl-phase1-lbp (6-cell grid + RLM vs chat summary)
+  run-phase1-msap  On pod: ${TMUX_SESSION}-p1-msap → ssl-phase1-msap
 
 Environment (optional overrides):
 
@@ -186,6 +204,8 @@ main() {
     run-lbp) cmd_run_lbp ;;
     run-msap) cmd_run_msap ;;
     run-both) cmd_run_both ;;
+    run-phase1-lbp) cmd_run_phase1_lbp ;;
+    run-phase1-msap) cmd_run_phase1_msap ;;
     help | -h | --help) cmd_help ;;
     *) die "unknown command: ${sub}; try: $0 help" ;;
   esac

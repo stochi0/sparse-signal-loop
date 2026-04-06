@@ -57,6 +57,52 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable env phase1_slice (no T6.1 @ 32k default pinning)",
     )
+    p.add_argument(
+        "--smoke",
+        action="store_true",
+        help=(
+            "Fast 1×1 smoke preset: num_examples=1, rollouts=1, max_concurrent=1, num_workers=1, "
+            "fewer chat/RLM turns and judge submissions, smaller phase2 skill cap, "
+            "higher RLM sandbox CPU/RAM and shorter sub-REPL depth. "
+            "Default cells: one chat cell (no Docker); pass --cells … for RLM smoke."
+        ),
+    )
+    p.add_argument(
+        "--rlm-sandbox-cpu",
+        type=int,
+        default=None,
+        help="RLM only: sandbox_cpu_cores (longbenchpro-rlm)",
+    )
+    p.add_argument(
+        "--rlm-sandbox-memory-gb",
+        type=int,
+        default=None,
+        help="RLM only: sandbox_memory_gb",
+    )
+    p.add_argument(
+        "--rlm-sandbox-disk-gb",
+        type=int,
+        default=None,
+        help="RLM only: sandbox_disk_size_gb",
+    )
+    p.add_argument(
+        "--rlm-sandbox-timeout-minutes",
+        type=int,
+        default=None,
+        help="RLM only: sandbox_timeout_minutes",
+    )
+    p.add_argument(
+        "--rlm-code-exec-timeout",
+        type=int,
+        default=None,
+        help="RLM only: code_execution_timeout (seconds per REPL run)",
+    )
+    p.add_argument(
+        "--rlm-sub-llm-max-turns",
+        type=int,
+        default=None,
+        help="RLM only: sub_llm_max_turns (tool turns inside each REPL call)",
+    )
     p.add_argument("--env-dir-path", default="./environments")
     p.add_argument("--api-key-var", default="PRIME_API_KEY")
     p.add_argument("--api-base-url", default="https://api.pinference.ai/api/v1")
@@ -92,6 +138,31 @@ def main() -> None:
     if args.verbose:
         setup_logging(get_log_level(True))
 
+    if args.smoke:
+        args.num_examples = 1
+        args.rollouts_per_example = 1
+        args.max_concurrent = 1
+        args.num_workers = "1"
+        args.max_turns_chat = 4
+        args.max_turns_rlm = 10
+        args.max_judge_submissions = 2
+        args.phase2_skill_max_chars = min(args.phase2_skill_max_chars, 2500)
+        if not args.cells:
+            args.cells = "chat__total_score__chat_no_file"
+        # RLM cells still get a beefier sandbox when you override --cells (optional CLI can replace)
+        if args.rlm_sandbox_cpu is None:
+            args.rlm_sandbox_cpu = 4
+        if args.rlm_sandbox_memory_gb is None:
+            args.rlm_sandbox_memory_gb = 8
+        if args.rlm_sandbox_disk_gb is None:
+            args.rlm_sandbox_disk_gb = 8
+        if args.rlm_sandbox_timeout_minutes is None:
+            args.rlm_sandbox_timeout_minutes = 45
+        if args.rlm_code_exec_timeout is None:
+            args.rlm_code_exec_timeout = 60
+        if args.rlm_sub_llm_max_turns is None:
+            args.rlm_sub_llm_max_turns = 3
+
     seed = None if args.no_seed else args.seed
     spec = Phase2LbpSpec(
         model=args.model,
@@ -111,6 +182,12 @@ def main() -> None:
         max_judge_submissions=args.max_judge_submissions,
         phase1_slice=not args.no_phase1_slice,
         phase2_skill_max_chars=args.phase2_skill_max_chars,
+        rlm_sandbox_cpu_cores=args.rlm_sandbox_cpu,
+        rlm_sandbox_memory_gb=args.rlm_sandbox_memory_gb,
+        rlm_sandbox_disk_size_gb=args.rlm_sandbox_disk_gb,
+        rlm_sandbox_timeout_minutes=args.rlm_sandbox_timeout_minutes,
+        rlm_code_execution_timeout=args.rlm_code_exec_timeout,
+        rlm_sub_llm_max_turns=args.rlm_sub_llm_max_turns,
         env_dir_path=args.env_dir_path,
         api_key_var=args.api_key_var,
         api_base_url=args.api_base_url,

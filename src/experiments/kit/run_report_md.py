@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from experiments.kit.harness_contrast import render_phase1_harness_contrast_markdown
 from experiments.kit.registry import benchmark_label, experiment_relative_id
 
 
@@ -150,24 +151,26 @@ def render_run_report_markdown(
     when = generated_at_utc or datetime.now(timezone.utc)
     when_s = when.strftime("%Y-%m-%d %H:%M UTC")
 
-    return "\n".join(
-        [
-            f"# {exp_key} · {run_id}",
-            "",
-            f"**Benchmark:** {title}",
-            "",
-            f"*{when_s}*",
-            "",
-            "## Config",
-            "",
-            f"```json\n{json.dumps(spec, indent=2)}\n```",
-            "",
-            "## Results",
-            "",
-            render_cells_table(cells),
-            "",
-        ]
-    )
+    parts = [
+        f"# {exp_key} · {run_id}",
+        "",
+        f"**Benchmark:** {title}",
+        "",
+        f"*{when_s}*",
+        "",
+        "## Config",
+        "",
+        f"```json\n{json.dumps(spec, indent=2)}\n```",
+        "",
+        "## Results",
+        "",
+        render_cells_table(cells),
+        "",
+    ]
+    contrast_md = render_phase1_harness_contrast_markdown(cells)
+    if contrast_md:
+        parts.append(contrast_md)
+    return "\n".join(parts)
 
 
 def write_run_report_md_from_payload(run_dir: Path, payload: dict[str, Any]) -> Path:

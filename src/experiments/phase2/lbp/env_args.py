@@ -25,4 +25,17 @@ def build_env_args(cell: Phase2Cell, spec: Phase2LbpSpec) -> dict[str, Any]:
     base["phase1_slice"] = spec.phase1_slice
     base["phase2_skill_mode"] = _phase2_mode_for_arm(cell.arm)
     base["phase2_skill_max_chars"] = int(spec.phase2_skill_max_chars)
+    if cell.harness is Phase0Harness.RLM:
+        if spec.rlm_sandbox_cpu_cores is not None:
+            base["sandbox_cpu_cores"] = int(spec.rlm_sandbox_cpu_cores)
+        if spec.rlm_sandbox_memory_gb is not None:
+            base["sandbox_memory_gb"] = int(spec.rlm_sandbox_memory_gb)
+        if spec.rlm_sandbox_disk_size_gb is not None:
+            base["sandbox_disk_size_gb"] = int(spec.rlm_sandbox_disk_size_gb)
+        if spec.rlm_sandbox_timeout_minutes is not None:
+            base["sandbox_timeout_minutes"] = int(spec.rlm_sandbox_timeout_minutes)
+        if spec.rlm_code_execution_timeout is not None:
+            base["code_execution_timeout"] = int(spec.rlm_code_execution_timeout)
+        if spec.rlm_sub_llm_max_turns is not None:
+            base["sub_llm_max_turns"] = int(spec.rlm_sub_llm_max_turns)
     return base
