@@ -23,9 +23,9 @@ Options:
   --dataset-start-index I      Start index for both datasets (default: 0)
   --model MODEL                Policy model id (default: z-ai/glm-4.7)
   --judge-model MODEL          Judge model id (default: z-ai/glm-4.7-flash)
-  --num-examples-lbp N         Examples per LBP phase (default: 120)
-  --num-examples-mswe N        Examples per mini-SWE phase (default: 60)
-  --rollouts R                 Rollouts per example (default: 1)
+  --num-examples-lbp N         Examples per LBP phase (default: 15)
+  --num-examples-mswe N        Examples per mini-SWE phase (default: 15)
+  --rollouts R                 Rollouts per example (default: 2)
   --max-concurrent C           Max concurrent rollouts (default: 1)
   --num-workers W              Env server workers int|auto (default: auto)
   --mswe-dataset NAME          mini-SWE dataset name (default: PrimeIntellect/SWE-Bench-Verified-Quick)
@@ -58,24 +58,24 @@ NO_PHASE1_SLICE=0
 DATASET_START_INDEX="${DATASET_START_INDEX:-0}"
 POLICY_MODEL="${POLICY_MODEL:-z-ai/glm-4.7}"
 JUDGE_MODEL="${JUDGE_MODEL:-z-ai/glm-4.7-flash}"
-NUM_EXAMPLES_LBP="${NUM_EXAMPLES_LBP:-120}"
-NUM_EXAMPLES_MSWE="${NUM_EXAMPLES_MSWE:-60}"
-ROLLOUTS="${ROLLOUTS:-1}"
-MAX_CONCURRENT="${MAX_CONCURRENT:-1}"
+NUM_EXAMPLES_LBP="${NUM_EXAMPLES_LBP:-15}"
+NUM_EXAMPLES_MSWE="${NUM_EXAMPLES_MSWE:-15}"
+ROLLOUTS="${ROLLOUTS:-2}"
+MAX_CONCURRENT="${MAX_CONCURRENT:-16}"
 NUM_WORKERS="${NUM_WORKERS:-auto}"
 MSWE_DATASET="${MSWE_DATASET:-PrimeIntellect/SWE-Bench-Verified-Quick}"
-MSWE_MAX_TURNS="${MSWE_MAX_TURNS:-120}"
-LBP_MAX_TURNS_CHAT="${LBP_MAX_TURNS_CHAT:-12}"
-LBP_MAX_TURNS_RLM="${LBP_MAX_TURNS_RLM:-36}"
-MAX_JUDGE_SUBMISSIONS="${MAX_JUDGE_SUBMISSIONS:-10}"
-PHASE2_SKILL_MAX_CHARS="${PHASE2_SKILL_MAX_CHARS:-8000}"
+MSWE_MAX_TURNS="${MSWE_MAX_TURNS:-128}"
+LBP_MAX_TURNS_CHAT="${LBP_MAX_TURNS_CHAT:-32}"
+LBP_MAX_TURNS_RLM="${LBP_MAX_TURNS_RLM:-64}"
+MAX_JUDGE_SUBMISSIONS="${MAX_JUDGE_SUBMISSIONS:-16}"
+PHASE2_SKILL_MAX_CHARS="${PHASE2_SKILL_MAX_CHARS:-16000}"
 
-LBP_RLM_SANDBOX_CPU="${LBP_RLM_SANDBOX_CPU:-8}"
+LBP_RLM_SANDBOX_CPU="${LBP_RLM_SANDBOX_CPU:-4}"
 LBP_RLM_SANDBOX_MEMORY_GB="${LBP_RLM_SANDBOX_MEMORY_GB:-16}"
 LBP_RLM_SANDBOX_DISK_GB="${LBP_RLM_SANDBOX_DISK_GB:-16}"
 LBP_RLM_SANDBOX_TIMEOUT_MINUTES="${LBP_RLM_SANDBOX_TIMEOUT_MINUTES:-120}"
 LBP_RLM_CODE_EXEC_TIMEOUT="${LBP_RLM_CODE_EXEC_TIMEOUT:-180}"
-LBP_RLM_SUB_LLM_MAX_TURNS="${LBP_RLM_SUB_LLM_MAX_TURNS:-8}"
+LBP_RLM_SUB_LLM_MAX_TURNS="${LBP_RLM_SUB_LLM_MAX_TURNS:-128}"
 
 RUN_STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 ROOT="$(repo_root)"
