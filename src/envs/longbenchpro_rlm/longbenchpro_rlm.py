@@ -15,8 +15,6 @@ from __future__ import annotations
 import json
 import os
 import random
-import re
-from itertools import combinations
 from pathlib import Path
 from typing import Any, Literal
 
@@ -32,6 +30,7 @@ from longbenchpro_rlm_prompts import (
     phase2_skill_suffix,
     resolve_phase1_lbp_filters,
 )
+from longbenchpro_rlm_task_metrics import accuracy, f1_score, ndcg, pairwise_accuracy, sub_em
 from verifiers.clients import resolve_client
 from verifiers.clients.openai_chat_completions_client import OpenAIChatCompletionsClient
 from verifiers.envs.experimental.rlm_env import RLMEnv
@@ -117,131 +116,6 @@ _PRIME_INFERENCE_API_BASE = "https://api.pinference.ai/api/v1"
 _DEFAULT_PRIME_JUDGE_MODEL = "openai/gpt-4.1-mini"
 
 
-# =============================================================================
-# Task-specific Metrics (from LongBench-Pro)
-# =============================================================================
-
-
-def _fix_spaces(text: str) -> str:
-    """Collapse multiple spaces into one."""
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def _normalize_prediction(prediction: str) -> list[str]:
-    """Normalize a model prediction into a list of answer lines.
-
-    Extracts text after [Answer] or [答案] markers, lowercases,
-    and splits by newline.
-    """
-    if "[Answer]" in prediction:
-        prediction = prediction[prediction.rfind("[Answer]") + len("[Answer]") :]
-    elif "[答案]" in prediction:
-        prediction = prediction[prediction.rfind("[答案]") + len("[答案]") :]
-
-    prediction = prediction.lower()
-    lines = [_fix_spaces(line.strip()) for line in prediction.split("\n")]
-    return lines
-
-
-def _normalize_answers(answers: list[str]) -> list[str]:
-    """Normalize ground-truth answers."""
-    return [_fix_spaces(a.lower().strip()) for a in answers]
-
-
-def _accuracy(answers: list[str], prediction: str) -> float:
-    """Exact match of first normalized answer vs first prediction line."""
-    norm_answers = _normalize_answers(answers)
-    norm_pred = _normalize_prediction(prediction)
-    if not norm_answers or not norm_pred:
-        return 0.0
-    return 1.0 if norm_answers[0] == norm_pred[0] else 0.0
-
-
-def _f1_score(answers: list[str], prediction: str) -> float:
-    """Set-based F1 between answer set and prediction set."""
-    norm_answers = _normalize_answers(answers)
-    norm_pred = _normalize_prediction(prediction)
-
-    answer_set = set(norm_answers)
-    prediction_set = set(norm_pred)
-
-    common = answer_set & prediction_set
-    if not common or not prediction_set or not answer_set:
-        return 0.0
-
-    precision = len(common) / len(prediction_set)
-    recall = len(common) / len(answer_set)
-
-    if precision + recall == 0:
-        return 0.0
-
-    return (2 * precision * recall) / (precision + recall)
-
-
-def _sub_em(answers: list[str], prediction: str) -> float:
-    """Fraction of reference answers found in prediction lines."""
-    norm_answers = _normalize_answers(answers)
-    norm_pred = _normalize_prediction(prediction)
-
-    if not norm_answers or not norm_pred:
-        return 0.0
-
-    found = sum(1.0 for a in norm_answers if a in norm_pred)
-    return found / len(norm_answers)
-
-
-def _ndcg(answers: list[str], prediction: str) -> float:
-    """NDCG@k for ranking tasks.
-
-    The answer list defines the ideal ranking with descending relevance scores.
-    """
-    try:
-        import pytrec_eval
-    except ImportError:
-        raise ImportError("pytrec_eval is required for NDCG. Install with: pip install pytrec-eval-terrier")
-
-    norm_answers = _normalize_answers(answers)
-    norm_pred = _normalize_prediction(prediction)
-
-    k = len(norm_answers)
-    if k == 0 or not norm_pred:
-        return 0.0
-
-    # Build relevance scores: first answer gets highest score
-    qrel = {"query": {a: len(norm_answers) - i for i, a in enumerate(norm_answers)}}
-
-    # Build run from predictions (dict comprehension: last occurrence overwrites)
-    run = {"query": {p: len(norm_pred) - i for i, p in enumerate(norm_pred)}}
-
-    ndcg_string = f"ndcg_cut.{k}"
-    evaluator = pytrec_eval.RelevanceEvaluator(qrel, {ndcg_string})
-    scores = evaluator.evaluate(run)
-
-    ndcg = sum(s[f"ndcg_cut_{k}"] for s in scores.values()) / len(scores)
-    return ndcg
-
-
-def _pairwise_accuracy(answers: list[str], prediction: str) -> float:
-    """Measures how well prediction preserves ordering of ground-truth answers."""
-    norm_answers = _normalize_answers(answers)
-    norm_pred = _normalize_prediction(prediction)
-
-    if len(norm_answers) < 2 or len(norm_pred) < 2:
-        return 0.0
-
-    n_total = len(norm_pred) * (len(norm_pred) - 1) // 2
-    # Last occurrence wins for duplicate predictions
-    pred_indices = {p: i for i, p in enumerate(norm_pred)}
-    n_correct = 0
-
-    for a, b in combinations(norm_answers, 2):
-        if a in pred_indices and b in pred_indices:
-            if pred_indices[a] < pred_indices[b]:
-                n_correct += 1
-
-    return n_correct / n_total
-
-
 # Maps secondary_task prefixes to metric functions
 # Note: T4.x (Summarization) tasks are excluded from this environment
 _TASK_METRIC_MAP: dict[str, str] = {
@@ -271,11 +145,11 @@ _TASK_METRIC_MAP: dict[str, str] = {
 }
 
 _METRIC_FUNCTIONS = {
-    "accuracy": _accuracy,
-    "f1_score": _f1_score,
-    "sub_em": _sub_em,
-    "ndcg": _ndcg,
-    "pairwise_accuracy": _pairwise_accuracy,
+    "accuracy": accuracy,
+    "f1_score": f1_score,
+    "sub_em": sub_em,
+    "ndcg": ndcg,
+    "pairwise_accuracy": pairwise_accuracy,
 }
 
 
