@@ -49,7 +49,9 @@ from .utils.prompts import (
     PHASE1_MSWE_DEFAULT_ONLY_REPOS,
     PROMPT_TEMPLATE,
     SYSTEM_PROMPT,
+    Phase2SkillMode,
     Phase1MemoryMode,
+    phase2_skill_suffix,
     phase1_working_memory_suffix,
     render_template,
 )
@@ -121,8 +123,11 @@ def _process_example(
     *,
     in_loop_suffix: str = "",
     phase1_suffix: str = "",
+    phase2_suffix: str = "",
     phase1_slice: bool = False,
     phase1_working_memory: str = "off",
+    phase2_skill_mode: str = "off",
+    phase2_skill_max_chars: int = 6000,
 ):
     """Process dataset example into rollout input format. Module-level for stable caching."""
     body = PROMPT_TEMPLATE.format(problem_statement=x["problem_statement"])
@@ -130,10 +135,14 @@ def _process_example(
         body += in_loop_suffix
     if phase1_suffix:
         body += phase1_suffix
+    if phase2_suffix:
+        body += phase2_suffix
     info = {
         **x,
         "phase1_slice": phase1_slice,
         "phase1_working_memory": phase1_working_memory,
+        "phase2_skill_mode": phase2_skill_mode,
+        "phase2_skill_max_chars": int(phase2_skill_max_chars),
     }
     return {
         "question": body,
@@ -1223,6 +1232,8 @@ def load_environment(
     dataset_start_index: int = 0,
     phase1_slice: bool = False,
     phase1_working_memory: Phase1MemoryMode = "off",
+    phase2_skill_mode: Phase2SkillMode = "off",
+    phase2_skill_max_chars: int = 6000,
     skip_swebench_install: bool = True,
     logger: Any = None,
     in_loop_judge: bool = False,
@@ -1235,6 +1246,11 @@ def load_environment(
 ) -> vf.Environment:
     if phase1_working_memory == "repl_files":
         raise ValueError("mini_swe_agent_plus has no REPL; use phase1_working_memory='chat' or 'off'.")
+    if phase2_skill_mode not in ("off", "chat_no_file", "chat_system_reinject"):
+        raise ValueError(
+            "mini_swe_agent_plus: phase2_skill_mode must be 'off', 'chat_no_file', or 'chat_system_reinject'; "
+            f"got {phase2_skill_mode!r}"
+        )
 
     split = "test" if "bench" in dataset_name.lower() else "train"
     harness = get_harness(dataset_name)
@@ -1250,6 +1266,11 @@ def load_environment(
         )
 
     phase1_suffix = phase1_working_memory_suffix(phase1_working_memory, rlm=False)
+    phase2_suffix = phase2_skill_suffix(
+        phase2_skill_mode,
+        rlm=False,
+        max_chars=int(phase2_skill_max_chars),
+    )
 
     if in_loop_judge and max_turns < 50:
         logging.getLogger(__name__).warning(
@@ -1274,8 +1295,11 @@ def load_environment(
             fn_kwargs={
                 "in_loop_suffix": in_loop_suffix,
                 "phase1_suffix": phase1_suffix,
+                "phase2_suffix": phase2_suffix,
                 "phase1_slice": phase1_slice,
                 "phase1_working_memory": phase1_working_memory,
+                "phase2_skill_mode": phase2_skill_mode,
+                "phase2_skill_max_chars": int(phase2_skill_max_chars),
             },
             remove_columns=ds.column_names,
         )

@@ -40,6 +40,7 @@ ssl-phase0-msap = "experiments.phase0.mini_swe.cli:main"
 ssl-phase1-lbp = "experiments.phase1.lbp.cli:main"
 ssl-phase1-msap = "experiments.phase1.mini_swe.cli:main"
 ssl-phase2-lbp = "experiments.phase2.lbp.cli:main"
+ssl-phase2-msap = "experiments.phase2.mini_swe.cli:main"
 ssl-experiment-report = "experiments.report_cli:main"
 
 [tool.uv]

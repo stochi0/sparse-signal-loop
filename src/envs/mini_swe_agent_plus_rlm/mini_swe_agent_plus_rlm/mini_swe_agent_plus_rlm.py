@@ -47,7 +47,9 @@ from .utils.prompts import (
     ACTION_OBSERVATION_TEMPLATE,
     PHASE1_MSWE_DEFAULT_ONLY_REPOS,
     REPL_PROMPT_TEMPLATE,
+    Phase2SkillMode,
     Phase1MemoryMode,
+    phase2_skill_suffix,
     phase1_working_memory_suffix,
     render_template,
 )
@@ -145,8 +147,11 @@ def _process_example(
     repl_tool_name: str,
     custom_instructions: str = "",
     phase1_suffix: str = "",
+    phase2_suffix: str = "",
     phase1_slice: bool = False,
     phase1_working_memory: str = "off",
+    phase2_skill_mode: str = "off",
+    phase2_skill_max_chars: int = 6000,
 ):
     """Process dataset example into rollout input format. Module-level for stable caching."""
     # Escape braces in problem statements to keep str.format from treating them as placeholders.
@@ -159,10 +164,14 @@ def _process_example(
         question += f"\n\n<custom_instructions>\n{custom_instructions.strip()}\n</custom_instructions>"
     if phase1_suffix:
         question += phase1_suffix
+    if phase2_suffix:
+        question += phase2_suffix
     info = {
         **x,
         "phase1_slice": phase1_slice,
         "phase1_working_memory": phase1_working_memory,
+        "phase2_skill_mode": phase2_skill_mode,
+        "phase2_skill_max_chars": int(phase2_skill_max_chars),
     }
     return {
         "question": question,
@@ -1257,6 +1266,8 @@ def load_environment(
     dataset_start_index: int = 0,
     phase1_slice: bool = False,
     phase1_working_memory: Phase1MemoryMode = "off",
+    phase2_skill_mode: Phase2SkillMode = "off",
+    phase2_skill_max_chars: int = 6000,
     tools_on_root: bool = False,
     tools_in_repl: bool = False,
     tools_on_sub: bool = True,
@@ -1340,6 +1351,11 @@ def load_environment(
         logger: Optional logger instance.
     """
     split = "test" if "bench" in dataset_name.lower() else "train"
+    if phase2_skill_mode not in ("off", "rlm_skill_file"):
+        raise ValueError(
+            "mini_swe_agent_plus_rlm: phase2_skill_mode must be 'off' or 'rlm_skill_file'; "
+            f"got {phase2_skill_mode!r}"
+        )
 
     if in_loop_judge and max_turns < 50:
         logging.getLogger(__name__).warning(
@@ -1364,6 +1380,11 @@ def load_environment(
         )
 
     phase1_suffix = phase1_working_memory_suffix(phase1_working_memory, rlm=True)
+    phase2_suffix = phase2_skill_suffix(
+        phase2_skill_mode,
+        rlm=True,
+        max_chars=int(phase2_skill_max_chars),
+    )
 
     repl_tool_name = "call_bash_repl" if repl_language == "bash" else "call_python_repl"
 
@@ -1399,8 +1420,11 @@ def load_environment(
                 "repl_tool_name": repl_tool_name,
                 "custom_instructions": ci_effective,
                 "phase1_suffix": phase1_suffix,
+                "phase2_suffix": phase2_suffix,
                 "phase1_slice": phase1_slice,
                 "phase1_working_memory": phase1_working_memory,
+                "phase2_skill_mode": phase2_skill_mode,
+                "phase2_skill_max_chars": int(phase2_skill_max_chars),
             },
             keep_in_memory=not use_dataset_cache,
             load_from_cache_file=use_dataset_cache,
