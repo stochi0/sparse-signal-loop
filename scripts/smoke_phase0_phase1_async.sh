@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # End-to-end smoke: Phase 0 / 1 / 2 LBP in parallel (same machine / pod).
 #
-#   From repo root (after `uv sync`, with PRIME_API_KEY in .env or env):
+#   From repo root (PRIME_API_KEY in .env or env for real runs):
 #     ./scripts/smoke_phase0_phase1_async.sh
+#   If `uv` is missing (fresh pod / git clone only), installs it like prime_pod_phase0_flow.sh, then `uv sync`.
 #
 #   Config only (no API calls):
 #     ./scripts/smoke_phase0_phase1_async.sh --dry-run
@@ -61,9 +62,22 @@ fi
 
 cd "${REPO_ROOT}" || die "cannot cd to ${REPO_ROOT}"
 
-if ! command -v uv >/dev/null 2>&1; then
-  die "uv not found; install uv and run from repo root after uv sync"
-fi
+ensure_uv() {
+  if command -v uv >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "uv not found; installing (same as prime_pod_phase0_flow.sh bootstrap)..."
+  command -v curl >/dev/null 2>&1 || die "install curl first: sudo apt-get update && sudo apt-get install -y curl"
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # shellcheck disable=SC1091
+  [[ -f "${HOME}/.local/bin/env" ]] && source "${HOME}/.local/bin/env"
+  export PATH="${HOME}/.local/bin:${PATH}"
+  command -v uv >/dev/null 2>&1 || die "uv not found after install; add ~/.local/bin to PATH or re-login"
+}
+
+ensure_uv
+echo "Syncing dependencies (uv sync)..."
+uv sync
 
 if [[ -z "${LOG_DIR}" ]]; then
   LOG_DIR="${REPO_ROOT}/outputs/smoke_logs/$(date -u +%Y%m%dT%H%M%SZ)"
