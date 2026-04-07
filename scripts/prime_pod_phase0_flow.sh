@@ -6,11 +6,19 @@
 #   ./scripts/prime_pod_phase0_flow.sh help-status
 #   prime pods ssh <pod-id>
 #
+# SSH: if "Permission denied (publickey)", register your pubkey with Prime, then use a new pod:
+#   ./scripts/prime_upload_ssh_pubkey.sh
+#   prime config set-ssh-key-path ~/.ssh/id_ed25519   # private key matching that .pub
+#
 # On the pod (after SSH), copy this repo or set SPARSE_SIGNAL_LOOP_REPO and run:
 #   curl -fsSL -o /tmp/flow.sh <raw-url-to-this-script>   # optional
 #   SPARSE_SIGNAL_LOOP_REPO=https://github.com/YOU/sparse-signal-loop.git \
 #     ./scripts/prime_pod_phase0_flow.sh bootstrap
 #   ./scripts/prime_pod_phase0_flow.sh run-lbp   # PRIME_API_KEY etc. from .env
+#
+# Phase 1 only, smallest run (1 example, 1 rollout):
+#   ./scripts/prime_pod_phase0_flow.sh run-phase1-lbp-smoke
+#   # or: NUM_EXAMPLES=1 ROLLOUTS=1 ./scripts/prime_pod_phase0_flow.sh run-phase1-lbp
 #
 # Or from a machine that already has the repo cloned at REPO_DIR:
 #   ./scripts/prime_pod_phase0_flow.sh bootstrap   # skips clone if REPO_DIR exists and is a git repo
@@ -85,6 +93,14 @@ Next steps (run on your local machine):
   prime pods status <pod-id>
   prime pods ssh <pod-id>
 
+If ssh says "Permission denied (publickey)": Prime only installs SSH keys that are on your account.
+From the repo (uses PRIME_API_KEY from .env):
+
+  ./scripts/prime_upload_ssh_pubkey.sh
+  prime config set-ssh-key-path ~/.ssh/id_ed25519
+
+Then create a new pod and ssh again — VMs provisioned before the key was uploaded may not get it.
+
 When finished (stops billing):
 
   prime pods terminate <pod-id>
@@ -106,7 +122,7 @@ cmd_bootstrap() {
   fi
 
   (cd "${REPO_DIR}" && uv sync)
-  echo "Bootstrap done. Ensure .env is in ${REPO_DIR} (or set ENV_FILE), then: $0 run-lbp | run-msap | run-both | run-phase1-lbp | run-phase1-msap"
+  echo "Bootstrap done. Ensure .env is in ${REPO_DIR} (or set ENV_FILE), then: $0 run-lbp | run-msap | run-both | run-phase1-lbp | run-phase1-msap | run-phase1-lbp-smoke"
 }
 
 _run_in_tmux() {
@@ -155,6 +171,15 @@ cmd_run_phase1_lbp() {
     "uv run ssl-phase1-lbp -m '${POLICY_MODEL}' --judge-model '${JUDGE_MODEL}' -n ${NUM_EXAMPLES} --dataset-start-index ${DATASET_START_INDEX} -r ${ROLLOUTS}"
 }
 
+# Phase 1 LBP with fixed -n 1 -r 1 (ignores NUM_EXAMPLES / ROLLOUTS). Use run-phase1-lbp + env vars for custom sizes.
+cmd_run_phase1_lbp_smoke() {
+  [[ -d "${REPO_DIR}" ]] || die "REPO_DIR missing: ${REPO_DIR} (run bootstrap first)"
+  [[ -n "${PRIME_API_KEY:-}" ]] || echo "warning: PRIME_API_KEY is unset"
+
+  _run_in_tmux "${TMUX_SESSION}-p1-lbp-smoke" \
+    "uv run ssl-phase1-lbp -m '${POLICY_MODEL}' --judge-model '${JUDGE_MODEL}' -n 1 --dataset-start-index ${DATASET_START_INDEX} -r 1"
+}
+
 cmd_run_phase1_msap() {
   [[ -d "${REPO_DIR}" ]] || die "REPO_DIR missing: ${REPO_DIR} (run bootstrap first)"
   [[ -n "${PRIME_API_KEY:-}" ]] || echo "warning: PRIME_API_KEY is unset"
@@ -174,6 +199,7 @@ Usage: $0 <command>
   run-msap     On pod: tmux session ${TMUX_SESSION}-msap → ssl-phase0-msap
   run-both     On pod: start both tmux sessions
   run-phase1-lbp   On pod: ${TMUX_SESSION}-p1-lbp → ssl-phase1-lbp (6-cell grid + RLM vs chat summary)
+  run-phase1-lbp-smoke  Same as run-phase1-lbp but fixed -n 1 -r 1 (smallest useful smoke test)
   run-phase1-msap  On pod: ${TMUX_SESSION}-p1-msap → ssl-phase1-msap
 
 Environment (optional overrides):
@@ -183,9 +209,9 @@ Environment (optional overrides):
   SPARSE_SIGNAL_LOOP_REPO Git URL for bootstrap clone
   POLICY_MODEL           (default: ${POLICY_MODEL})
   JUDGE_MODEL            (default: ${JUDGE_MODEL})
-  NUM_EXAMPLES           (default: ${NUM_EXAMPLES})
+  NUM_EXAMPLES           (default: ${NUM_EXAMPLES}; not used by run-phase1-lbp-smoke)
   DATASET_START_INDEX    (default: ${DATASET_START_INDEX})
-  ROLLOUTS               (default: ${ROLLOUTS})
+  ROLLOUTS               (default: ${ROLLOUTS}; not used by run-phase1-lbp-smoke)
   PRIME_API_KEY          Required for eval API calls (often set via .env)
   TMUX_SESSION           Prefix for session names (default: phase0-eval)
   ENV_FILE               Explicit path to dotenv (default: try REPO_DIR/.env then repo-root .env)
@@ -205,6 +231,7 @@ main() {
     run-msap) cmd_run_msap ;;
     run-both) cmd_run_both ;;
     run-phase1-lbp) cmd_run_phase1_lbp ;;
+    run-phase1-lbp-smoke) cmd_run_phase1_lbp_smoke ;;
     run-phase1-msap) cmd_run_phase1_msap ;;
     help | -h | --help) cmd_help ;;
     *) die "unknown command: ${sub}; try: $0 help" ;;
