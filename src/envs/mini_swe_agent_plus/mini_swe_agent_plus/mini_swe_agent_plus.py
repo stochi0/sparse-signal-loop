@@ -43,6 +43,8 @@ from .mini_swe_judge_prompts import (
     swe_judge_prompt_for_mode,
 )
 from .utils.execution_log_parser import decolor_dict_keys, parse_log_fn
+from .utils.env_runtime import ENV_VARS_R2E, ENV_VARS_SWEBENCH
+from .utils.judge_helpers import judge_reference_from_row, msap_judge_verdict
 from .utils.prompts import (
     ACTION_OBSERVATION_TEMPLATE,
     FORMAT_ERROR_TEMPLATE,
@@ -88,34 +90,8 @@ TOOLS_DIR = Path(__file__).resolve().parent.parent / "tools"
 EXECUTE_BASH = TOOLS_DIR / "execute_bash.py"
 STR_REPLACE = TOOLS_DIR / "str_replace.py"
 
-# TODO: remove workaround after overwriting ENV is fixed in prime-sandboxes
-PATH_SWEBENCH = (
-    "PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/bin:/usr/local/sbin:"
-    "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-)
-PATH_R2E = "PATH=/testbed/.venv/bin:/root/.local/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ENV_VARS_SWEBENCH = f"export {PATH_SWEBENCH} PAGER=cat MANPAGER=cat LESS=-R PIP_PROGRESS_BAR=off TQDM_DISABLE=1;"
-ENV_VARS_R2E = f"export {PATH_R2E} PAGER=cat MANPAGER=cat LESS=-R PIP_PROGRESS_BAR=off TQDM_DISABLE=1;"
-
 _PRIME_INFERENCE_API_BASE = "https://api.pinference.ai/api/v1"
 _DEFAULT_PRIME_JUDGE_MODEL = "openai/gpt-4.1-mini"
-
-
-def _judge_reference_from_row(x: dict[str, Any]) -> str:
-    """Build hidden reference text for the LLM judge (patch + problem when available)."""
-    ps = (x.get("problem_statement") or "").strip()
-    patch = (x.get("patch") or "").strip()
-    if len(patch) > 12_000:
-        patch = patch[:12_000] + "\n... (truncated)"
-    if patch:
-        return (
-            "Reference fix patch (for grading only; do not disclose in feedback to the agent):\n"
-            f"```diff\n{patch}\n```\n\nProblem statement:\n{ps[:8000]}"
-        )
-    return (
-        "Problem statement (no reference patch in dataset; judge whether the submission plausibly addresses it):\n"
-        f"{ps[:12_000]}"
-    )
 
 
 def _process_example(
@@ -147,34 +123,8 @@ def _process_example(
     return {
         "question": body,
         "info": info,
-        "answer": _judge_reference_from_row(x),
+        "answer": judge_reference_from_row(x),
     }
-
-
-def _msap_judge_verdict(judge_text: str) -> tuple[bool, str]:
-    """Parse YES/NO first line; remainder is feedback (same convention as longbenchpro)."""
-    raw = (judge_text or "").strip()
-    if not raw:
-        return False, ""
-    lines = raw.splitlines()
-    first_line = lines[0].strip()
-    upper_line = first_line.upper()
-    tokens = first_line.split()
-    first_tok = tokens[0].upper() if tokens else ""
-
-    if first_tok == "NO" or upper_line.startswith("NO"):
-        correct = False
-    elif first_tok == "YES" or upper_line.startswith("YES"):
-        correct = True
-    else:
-        correct = False
-
-    feedback = "\n".join(lines[1:]).strip()
-    if not correct and not feedback:
-        feedback = (
-            "The judge did not accept this submission; keep iterating on a fix consistent with the PR description."
-        )
-    return correct, feedback
 
 
 def _append_to_last_tool_message_msap(messages: vf.Messages, extra: str) -> vf.Messages:
@@ -1121,7 +1071,7 @@ class DeepSweSandboxInLoopJudgeEnv(DeepSweSandboxEnv):
         except Exception as e:
             judge_text = f"NO\nJudge call failed ({e!r}). Continue editing and submit again when ready."
 
-        correct, feedback = _msap_judge_verdict(judge_text)
+        correct, feedback = msap_judge_verdict(judge_text)
         if correct:
             return env_messages
 
@@ -1355,7 +1305,7 @@ def load_environment(
                 )
             except Exception:
                 return 0.0
-            correct, _ = _msap_judge_verdict(judge_text)
+            correct, _ = msap_judge_verdict(judge_text)
             return 1.0 if correct else 0.0
 
         judge_rubric.add_reward_func(judge_reward, weight=0.0)

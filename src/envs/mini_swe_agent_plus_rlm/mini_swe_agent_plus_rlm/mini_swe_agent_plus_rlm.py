@@ -43,6 +43,8 @@ from .mini_swe_judge_prompts import (
     swe_judge_prompt_for_mode,
 )
 from .utils.execution_log_parser import decolor_dict_keys, parse_log_fn
+from .utils.env_runtime import ENV_VARS, PATH
+from .utils.judge_helpers import judge_reference_from_row, msap_judge_verdict
 from .utils.prompts import (
     ACTION_OBSERVATION_TEMPLATE,
     PHASE1_MSWE_DEFAULT_ONLY_REPOS,
@@ -53,15 +55,8 @@ from .utils.prompts import (
     phase1_working_memory_suffix,
     render_template,
 )
-from .utils.sandbox_retry import (
-    is_retryable_sandbox_api_error,
-    is_retryable_sandbox_read_error,
-)
-
-# TODO: make nicer with  _init__.py
-from .utils.swebench_utils import (
-    get_logs_eval,
-)
+from .utils.sandbox_retry import is_retryable_sandbox_api_error, is_retryable_sandbox_read_error
+from .utils.swebench_utils import get_logs_eval
 
 # Suppress httpx INFO logs (must run after httpx is imported)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -70,53 +65,8 @@ TOOLS_DIR = Path(__file__).resolve().parent.parent / "tools"
 EXECUTE_BASH = TOOLS_DIR / "execute_bash.py"
 STR_REPLACE = TOOLS_DIR / "str_replace.py"
 
-# TODO: remove workaround after overwriting ENV is fixed in prime-sandboxes
-PATH = "PATH=/opt/miniconda3/bin:/testbed/.venv/bin:/root/.local/bin:/root/.cargo/bin:/go/bin:/usr/local/go/bin:/usr/local/cargo:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ENV_VARS = f"export {PATH} PAGER=cat MANPAGER=cat LESS=-R PIP_PROGRESS_BAR=off TQDM_DISABLE=1;"
-
 _PRIME_INFERENCE_API_BASE = "https://api.pinference.ai/api/v1"
 _DEFAULT_PRIME_JUDGE_MODEL = "openai/gpt-4.1-mini"
-
-
-def _judge_reference_from_row(x: dict[str, Any]) -> str:
-    ps = (x.get("problem_statement") or "").strip()
-    patch = (x.get("patch") or "").strip()
-    if len(patch) > 12_000:
-        patch = patch[:12_000] + "\n... (truncated)"
-    if patch:
-        return (
-            "Reference fix patch (for grading only; do not disclose in feedback to the agent):\n"
-            f"```diff\n{patch}\n```\n\nProblem statement:\n{ps[:8000]}"
-        )
-    return (
-        "Problem statement (no reference patch in dataset; judge whether the submission plausibly addresses it):\n"
-        f"{ps[:12_000]}"
-    )
-
-
-def _msap_judge_verdict(judge_text: str) -> tuple[bool, str]:
-    raw = (judge_text or "").strip()
-    if not raw:
-        return False, ""
-    lines = raw.splitlines()
-    first_line = lines[0].strip()
-    upper_line = first_line.upper()
-    tokens = first_line.split()
-    first_tok = tokens[0].upper() if tokens else ""
-
-    if first_tok == "NO" or upper_line.startswith("NO"):
-        correct = False
-    elif first_tok == "YES" or upper_line.startswith("YES"):
-        correct = True
-    else:
-        correct = False
-
-    feedback = "\n".join(lines[1:]).strip()
-    if not correct and not feedback:
-        feedback = (
-            "The judge did not accept this submission; keep iterating on a fix consistent with the PR description."
-        )
-    return correct, feedback
 
 
 def _append_to_last_tool_message_msap(messages: vf.Messages, extra: str) -> vf.Messages:
@@ -176,7 +126,7 @@ def _process_example(
     return {
         "question": question,
         "info": info,
-        "answer": _judge_reference_from_row(x),
+        "answer": judge_reference_from_row(x),
     }
 
 
@@ -1155,7 +1105,7 @@ class MiniSweAgentPlusRLMInLoopJudgeEnv(MiniSweAgentPlusRLMEnv):
         except Exception as e:
             judge_text = f"NO\nJudge call failed ({e!r}). Revise in the REPL and submit again when ready."
 
-        correct, feedback = _msap_judge_verdict(judge_text)
+        correct, feedback = msap_judge_verdict(judge_text)
         if correct:
             return tool_messages
 
@@ -1481,7 +1431,7 @@ def load_environment(
                 )
             except Exception:
                 return 0.0
-            correct, _ = _msap_judge_verdict(judge_text)
+            correct, _ = msap_judge_verdict(judge_text)
             return 1.0 if correct else 0.0
 
         judge_rubric.add_reward_func(judge_reward, weight=0.0)
