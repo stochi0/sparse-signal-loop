@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from experiments.phase0.schema import Phase0Spec
+from experiments.common.schema import BaseSpec
 
 
 @dataclass
-class Phase2LbpSpec(Phase0Spec):
+class Phase2LbpSpec(BaseSpec):
     """LBP knobs for Phase 2 (Phase 1 slice pinning; Phase 1 working memory forced off in env_args)."""
 
     phase1_slice: bool = True

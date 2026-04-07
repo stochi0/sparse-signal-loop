@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from experiments.phase0.schema import Phase0Feedback, Phase0Harness
+from experiments.common.schema import BaseFeedback, BaseHarness
 
 
 class Phase1WorkingMemory(str, Enum):
@@ -17,8 +17,8 @@ class Phase1WorkingMemory(str, Enum):
 class Phase1Cell:
     """Phase 1 grid: chat harness (notes-in-chat only) vs RLM × {chat ablation, repl files} × judge feedback."""
 
-    harness: Phase0Harness
-    feedback: Phase0Feedback
+    harness: BaseHarness
+    feedback: BaseFeedback
     memory: Phase1WorkingMemory
 
     def slug(self) -> str:
@@ -28,9 +28,9 @@ class Phase1Cell:
     def factorial_design() -> list[Phase1Cell]:
         """Six cells: 2 (chat × feedback) + 4 (RLM × 2 memory × 2 feedback)."""
         out: list[Phase1Cell] = []
-        for f in (Phase0Feedback.TOTAL_SCORE, Phase0Feedback.SINGLE_CRITERION):
-            out.append(Phase1Cell(Phase0Harness.CHAT, f, Phase1WorkingMemory.CHAT))
-        for f in (Phase0Feedback.TOTAL_SCORE, Phase0Feedback.SINGLE_CRITERION):
-            out.append(Phase1Cell(Phase0Harness.RLM, f, Phase1WorkingMemory.CHAT))
-            out.append(Phase1Cell(Phase0Harness.RLM, f, Phase1WorkingMemory.REPL_FILES))
+        for f in (BaseFeedback.TOTAL_SCORE, BaseFeedback.SINGLE_CRITERION):
+            out.append(Phase1Cell(BaseHarness.CHAT, f, Phase1WorkingMemory.CHAT))
+        for f in (BaseFeedback.TOTAL_SCORE, BaseFeedback.SINGLE_CRITERION):
+            out.append(Phase1Cell(BaseHarness.RLM, f, Phase1WorkingMemory.CHAT))
+            out.append(Phase1Cell(BaseHarness.RLM, f, Phase1WorkingMemory.REPL_FILES))
         return out

@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-from verifiers.types import ClientConfig, ClientType, EvalConfig
+from verifiers.types import ClientConfig, EvalConfig
 
+from experiments.common.client import build_client_config as build_shared_client_config
 from experiments.phase0.schema import Phase0Cell, Phase0Spec
 
 from .env_args import build_env_args, env_id_for_cell
 
 
 def build_client_config(spec: Phase0Spec) -> ClientConfig:
-    return ClientConfig(
-        client_type=cast(ClientType, spec.client_type),
-        api_key_var=spec.api_key_var,
-        api_base_url=spec.api_base_url,
-    )
+    return build_shared_client_config(spec)
 
 
 def build_eval_config(

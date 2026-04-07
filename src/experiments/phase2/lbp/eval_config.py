@@ -5,7 +5,7 @@ from typing import Any
 
 from verifiers.types import ClientConfig, EvalConfig
 
-from experiments.phase0.lbp.eval_config import build_client_config as build_lbp_client_config
+from experiments.common.client import build_client_config as build_shared_client_config
 from experiments.phase2.schema import Phase2Cell
 
 from .env_args import build_env_args, env_id_for_cell
@@ -13,7 +13,7 @@ from .schema import Phase2LbpSpec
 
 
 def build_client_config(spec: Phase2LbpSpec) -> ClientConfig:
-    return build_lbp_client_config(spec)
+    return build_shared_client_config(spec)
 
 
 def build_eval_config(
